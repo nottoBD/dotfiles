@@ -1,0 +1,14 @@
+# /etc/profile.d/
+export CLICOLOR=1
+export LSCOLORS=ExFxBxDxCxegedabagacad
+export KEY_PASSWORD_STORE=F12382BBA5604F9C1781BA21332971AAE7B0FDB9
+export XDG_CONFIG_HOME="$HOME/.config"
+export EDITOR=vim
+export QT_QPA_PLATFORMTHEME="qt5ct"
+export PATH="$PATH:$(go env GOBIN):$(go env GOPATH)/bin"
+export VIMDATA=~/.local/share/nvim
+export VIMCONFIG=~/.config/nvim
+export PATH=$PATH:$VIMCONFIG/pack/bundle/start/fzf/bin
+export PATH=$PATH:/home/devid/intelliJ/bin
+export IDEA_HOME=/home/devid/intelliJ
+export GOPATH=/home/devid/go
