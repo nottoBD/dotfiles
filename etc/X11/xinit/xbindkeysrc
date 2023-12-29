@@ -1,0 +1,17 @@
+# Brightness Down
+# "light -U 10"
+"echo $(($(cat /sys/class/backlight/intel_backlight/brightness) - 250)) | sudo tee /sys/class/backlight/intel_backlight/brightness"  
+   XF86MonBrightnessDown
+
+# Brightness Up
+# "light -A 10"
+"echo $(($(cat /sys/class/backlight/intel_backlight/brightness) + 750)) | sudo tee /sys/class/backlight/intel_backlight/brightness"  
+    XF86MonBrightnessUp
+
+# Volume Down
+"amixer -q sset Master 5%-"
+   XF86AudioLowerVolume
+
+# Volume Up
+"amixer -q sset Master 5%+"
+   XF86AudioRaiseVolume

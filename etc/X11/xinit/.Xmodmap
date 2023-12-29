@@ -1,0 +1,8 @@
+keycode 66 = BackSpace
+clear Lock
+keycode 108 = Mode_switch 
+keycode 28 = t T asciitilde 
+keycode 30 = u U mu
+keycode 11 = 2 at eacute
+keycode 16 = 7 ampersand egrave
+keycode 19 = 0 parenright agrave
