@@ -1,0 +1,11 @@
+Defaults editor=/usr/bin/vim
+root ALL=(ALL:ALL) ALL
+
+%wheel ALL=(ALL:ALL) ALL
+
+@includedir /etc/sudoers.d
+
+devid ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/class/backlight/intel_backlight/brightness
+devid ALL=(ALL) NOPASSWD: /bin/cat /sys/class/backlight/intel_backlight/brightness
+devid ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart iwd
+
