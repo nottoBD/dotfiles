@@ -42,23 +42,19 @@ myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
  
    -- Close focused window
     , ((modm, xK_Escape), kill)
-
+  
     , ((modm, xK_i),  spawn "xcalib -invert -alter")
     -- launch a terminal
     , ((modm, xK_grave), spawn  "sudo systemctl restart iwd")
    
     , ((modm .|. shiftMask, xK_Tab), spawn  "alacritty -e ranger")
 
-    , ((modm, xK_y), spawn "brave-nightly --app=https://youtube.com --incognito")
     -- launch dmenu with dmenu-desktop (to include .desktop entries)
     , ((modm, xK_p), spawn "j4-dmenu-desktop --dmenu=\"(cat ; (stest -flx $(echo $PATH | tr : ' ') | sort -u)) | dmenu\"")
     
     , ((modm .|. shiftMask, xK_l), spawn  "xtrlock")
     
     , ((modm .|. shiftMask, xK_x), spawn "/home/devid/git/script/shutdown_if_no_keypress.sh")
-
-    -- launch brave
-    -- , ((modm .|. shiftMask, xK_w     ), spawn "brave-beta")
 
     -- close focused window
     , ((modm .|. shiftMask, xK_c     ), kill)
@@ -118,7 +114,7 @@ myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
     , ((modm .|. shiftMask, xK_q     ), io (exitWith ExitSuccess))
 
     -- Restart xmonad
-    , ((modm              , xK_q     ), spawn "feh --bg-scale --randomize /usr/share/Wallpapers/*; xmonad --recompile; xmonad --restart; xmobar --recompile; xmodmap /etc/X11/xinit/.Xmodmap")
+    , ((modm              , xK_q     ), spawn "xmonad --recompile; xmonad --restart; xmodmap /etc/X11/xinit/.Xmodmap")
 
     -- Run xmessage with a summary of the default keybindings (useful for beginners)
     -- , ((modm .|. shiftMask, xK_slash ), spawn ("echo \"" ++ help ++ "\" | xmessage -file -"))
