@@ -25,12 +25,10 @@ myClickJustFocuses :: Bool
 myClickJustFocuses = False
 myBorderWidth   = 1
 myModMask       = mod4Mask
--- > workspaces = ["web", "irc", "code" ] ++ map show [4..9]
 myWorkspaces    = ["1","2","3","4","5","6","7","8","9"]
 myNormalBorderColor  = "#000000"
 myFocusedBorderColor = "#ad0000"
 
---
 myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
     [
 
@@ -40,20 +38,25 @@ myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
     -- Swap the focused window and the master window
     , ((modm, xK_BackSpace), windows W.swapMaster)
  
-   -- Close focused window
+    -- Close focused window
     , ((modm, xK_Escape), kill)
-  
+    
+    -- Invert colors
     , ((modm, xK_i),  spawn "xcalib -invert -alter")
-    -- launch a terminal
+    
+    -- Restart iwd
     , ((modm, xK_grave), spawn  "sudo systemctl restart iwd")
-   
+
+    -- Launch Ranger
     , ((modm .|. shiftMask, xK_Tab), spawn  "alacritty -e ranger")
 
     -- launch dmenu with dmenu-desktop (to include .desktop entries)
     , ((modm, xK_p), spawn "j4-dmenu-desktop --dmenu=\"(cat ; (stest -flx $(echo $PATH | tr : ' ') | sort -u)) | dmenu\"")
-    
+   
+    -- Easy lock
     , ((modm .|. shiftMask, xK_l), spawn  "xtrlock")
     
+    -- Fastshutdown
     , ((modm .|. shiftMask, xK_x), spawn "/home/devid/git/script/shutdown_if_no_keypress.sh")
 
     -- close focused window
@@ -105,9 +108,8 @@ myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
     , ((modm              , xK_period), sendMessage (IncMasterN (-1)))
 
     -- Toggle the status bar gap
-    -- Use this binding with avoidStruts from Hooks.ManageDocks.
-    -- See also the statusBar function from Hooks.DynamicLog.
-    --
+    -- Use this binding with avoidStruts from Hooks.ManageDocks
+    -- See also the statusBar function from Hooks.DynamicLog
     -- , ((modm              , xK_b     ), sendMessage ToggleStruts)
 
     -- Quit xmonad
@@ -139,9 +141,6 @@ myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
         , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]]
 
 
-------------------------------------------------------------------------
--- Mouse bindings: default actions bound to mouse events
---
 myMouseBindings (XConfig {XMonad.modMask = modm}) = M.fromList $
 
     -- mod-button1, Set the window to floating mode and move by dragging
@@ -155,51 +154,16 @@ myMouseBindings (XConfig {XMonad.modMask = modm}) = M.fromList $
     , ((modm, button3), (\w -> focus w >> mouseResizeWindow w
                                        >> windows W.shiftMaster))
 
-    -- you may also bind events to the mouse scroll wheel (button4 and button5)
     ]
 
-------------------------------------------------------------------------
-------------------------------------------------------------------------
---
-------------------------------------------------------------------------
-------------------------------------------------------------------------
--- Layouts:
--- avoidStruts to let xmobar room
-
--- spacing : 10 pixels around all
---myLayout = avoidStruts ( spacing 6 tiled ||| spacing 4 threecol  ||| noBorders Full )
 myLayout = avoidStrutsOn [U] (spacing 6 tiled ||| spacing 0 threecol) ||| noBorders Full
   where
-     -- StackTile layout with master on the right and stacking on the left
      threecol = ThreeColMid 1 (3/100) (6/10)
-
-     -- default tiling algorithm partitions the screen into two panes
      tiled   = Tall nmaster delta ratio
-
-     -- The default number of windows in the master pane
      nmaster = 1
-
-     -- Default proportion of screen occupied by master pane
      ratio   = 2/3
-
-     -- Percent of screen to increment by when resizing panes
      delta   = 4/100
 
-------------------------------------------------------------------------
--- Window rules:
-
--- Execute arbitrary actions and WindowSet manipulations when managing
--- a new window. You can use this to, for example, always float a
--- particular program, or have a client always appear on a particular
--- workspace.
---
--- To find the property name associated with a program, use
--- > xprop | grep WM_CLASS
--- and click on the client you're interested in.
---
--- To match on the WM_NAME, you can use 'title' in the same way that
--- 'className' and 'resource' are used below.
---
 myManageHook = composeAll
     [ className =? "MPlayer"             --> doFloat
     , className =? "Gimp"                --> doFloat
@@ -210,35 +174,9 @@ myManageHook = composeAll
     ] <+> manageDocks
 
 
-
-------------------------------------------------------------------------
--- Event handling
-
--- * EwmhDesktops users should change this to ewmhDesktopsEventHook
---
--- Defines a custom handler function for X Events. The function should
--- return (All True) if the default handler is to be run afterwards. To
--- combine event hooks use mappend or mconcat from Data.Monoid.
---
 myEventHook = mempty
 
-------------------------------------------------------------------------
--- Status bars and logging
-
--- Perform an arbitrary action on each internal state change or X event.
--- See the 'XMonad.Hooks.DynamicLog' extension for examples.
---
 myLogHook = return ()
-
-------------------------------------------------------------------------
--- Startup hook
-
--- Perform an arbitrary action each time xmonad starts or is restarted
--- with mod-q.  Used by, e.g., XMonad.Layout.PerWorkspace to initialize
--- per-workspace layout choices.
---
--- By default, do nothing.
-
 
 myStartupHook = do
     spawnOnce "xset r rate 300 50"
@@ -255,14 +193,7 @@ main = do
             }
         }
 
--- A structure containing your configuration settings, overriding
--- fields in the default config. Any you don't override, will
--- use the defaults defined in xmonad/XMonad/Config.hs
---
--- No need to modify this.
---
 defaults = def {
-      -- simple stuff
         terminal           = "alacritty",
         focusFollowsMouse  = True,
         clickJustFocuses   = True,
@@ -283,5 +214,4 @@ defaults = def {
         logHook            = myLogHook,
         startupHook        = myStartupHook
    }
-
 
