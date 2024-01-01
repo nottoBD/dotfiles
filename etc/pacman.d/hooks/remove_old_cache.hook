@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Remove
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Keep the previous 2 pkg versions + currently installed...
+When = PostTransaction
+Exec = /usr/bin/paccache -rvk3
