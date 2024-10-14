@@ -1,0 +1,15 @@
+.bash_history
+.cache/
+.conda/
+.docker/
+.mozilla/
+.npm/
+.gnupg/
+.pki/
+.python_history
+.vscode/
+.ssh/
+node_modules/
+downloads/
+ulb/
+documents/
