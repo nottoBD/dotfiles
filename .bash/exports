@@ -1,0 +1,16 @@
+# /etc/profile.d/
+export CLICOLOR=1
+export EDITOR=vim
+export GPT_TTY=$(tty)
+export HISTCONTROL=ignorespace
+export HISTFILE=/home/$USER/.bash/history/.bash_history
+export LSCOLORS=ExFxBxDxCxegedabagacad
+export PATH="/opt/miniconda3/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/local/go/bin:/home/devid/go/bin:/home/devid/.local/bin:/home/devid/.config/dmscripts/scripts"
+export QT_QPA_PLATFORMTHEME="qt5ct"
+export VIMCONFIG=~/.config/nvim
+export VIMDATA=~/.local/share/nvim
+export VISUAL=vim
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_RUNTIME_DIR="/run/user/1000"
+export XDG_SESSION_TYPE=x11
+export XMONAD_CONFIG_DIR="$HOME/.config/xmonad"

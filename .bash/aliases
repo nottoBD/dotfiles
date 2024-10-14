@@ -1,0 +1,17 @@
+# /etc/profile.d/
+alias ..='cd ..'
+alias Caps='xdotool key Caps_Lock'
+alias Cp='xclip -selection clipboard'
+alias Mirrors='sudo reflector --verbose --country "France,Germany,United Kingdom,Netherlands,Belgium,Luxembourg,Ireland,Austria,Switzerland" --age 12 --protocol https --sort rate --save /etc/pacman.d/mirrorlist --fastest 8'
+alias Orphans='sudo pacman -Rns $(pacman -Qdtq)'
+alias Recompile='cd $HOME/.config/xmonad/ && ghc --make xmonad.hs -i -ilib -dynamic -fforce-recomp  -o xmonad-x86_64-linux'
+alias Shutdown='shutdown -h now'
+alias Sized='sudo du -h / | grep "[0-9\.]\+G\|[5-9][0-9][0-9]M" | sort -rh'
+alias Sshp='eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519_github'
+alias Sysblue='systemctl start bluetooth.service'
+alias Xmodmap='xmodmap /home/devid/.xmodmap'
+alias grep='grep --color=auto'
+alias ls='exa -al --color=always --group-directories-first --icons'
+alias xev='xev | grep keycode'
+alias xprop='xprop | grep WM_CLASS'
+
