@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Directories to preserve
+preserve=(".bash" ".config" ".log" ".ssh" ".cache" ".local" ".password-store")
+
+# XDG Base Directories
+CONFIG_DIR="$HOME/.config"
+CACHE_DIR="$HOME/.cache"
+DATA_DIR="$HOME/.local/share"
+LOG_DIR="$HOME/.log/filesystem"
+LOG_FILE="$LOG_DIR/aggregated_filesystem.log"
+
+# Create log directory if it doesn't exist
+if [ ! -d "$LOG_DIR" ]; then
+    mkdir -p "$LOG_DIR"
+    echo "[$(date)] Created log directory: $LOG_DIR" >> "$LOG_FILE"
+fi
+
+# Start brief logging
+echo "[$(date)] Starting XDG file management..." >> "$LOG_FILE"
+
+# Find dotfolders only (excluding files), skip preserved directories
+dotfolders=$(find ~ -maxdepth 1 -mindepth 1 -name ".*" -type d)
+
+for dir in $dotfolders; do
+    dirname=$(basename "$dir")
+
+    # Skip preserved directories
+    if [[ " ${preserve[@]} " =~ " ${dirname} " ]]; then
+        continue
+    fi
+
+    # Skip if already inside .config, .cache, or .local/share
+    if [[ "$dir" == *"$CONFIG_DIR"* || "$dir" == *"$CACHE_DIR"* || "$dir" == *"$DATA_DIR"* ]]; then
+        continue
+    fi
+
+    # Determine destination based on type of folder (configuration, cache, or data)
+    case "$dirname" in
+        .cache*)
+            dest_dir="$CACHE_DIR/$dirname"
+            ;;
+        .local*)
+            dest_dir="$DATA_DIR/$dirname"
+            ;;
+        *)
+            dest_dir="$CONFIG_DIR/$dirname"
+            ;;
+    esac
+
+    # Move the directory if it exists and isn't already symlinked
+    if [ -d "$dir" ] && [ ! -L "$dir" ]; then
+        mv "$dir" "$dest_dir" 2>>"$LOG_FILE"
+        ln -s "$dest_dir" "$dir" 2>>"$LOG_FILE"
+        echo "[$(date)] Moved $dirname to $dest_dir and symlinked." >> "$LOG_FILE"
+    else
+        echo "[$(date)] $dirname already moved or symlinked. Skipping." >> "$LOG_FILE"
+    fi
+done
+
+# End logging
+echo "[$(date)] XDG file management completed." >> "$LOG_FILE"
+

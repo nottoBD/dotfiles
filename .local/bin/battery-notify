@@ -1,0 +1,10 @@
+#!/bin/bash
+
+battery_level=$(cat /sys/class/power_supply/BAT1/capacity)
+
+if [ "$battery_level" -le 20 ]; then
+    notify-send "Battery Alert" "Battery below 20%. Please plug in the charger!"
+elif [ "$battery_level" -le 40 ]; then
+    notify-send "Battery Alert" "Battery below 40%. Consider charging soon."
+fi
+
