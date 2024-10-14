@@ -1,0 +1,22 @@
+clear Lock
+keycode 108 = Mode_switch
+keycode 64 = Mode_switch
+
+keycode 11 = 2 at eacute
+keycode 16 = 7 ampersand egrave
+keycode 17 = 8 asterisk
+keycode 18 = 9 parenleft ccedilla
+keycode 19 = 0 parenright agrave
+keycode 20 = minus underscore
+keycode 21 = equal plus EuroSign
+keycode 23 = Tab
+keycode 26 = e E ecircumflex
+keycode 28 = t T asciitilde
+keycode 30 = u U ucircumflex
+keycode 31 = i I icircumflex
+keycode 32 = o O ocircumflex
+keycode 38 = a A acircumflex
+keycode 48 = apostrophe quotedbl ugrave
+keycode 49 = grave asciitilde mu
+keycode 54 = c C ccedilla
+keycode 66 = BackSpace Delete Delete
