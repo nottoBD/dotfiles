@@ -1,0 +1,73 @@
+! FR-latin keys in a US-en layout
+clear Lock
+
+! MODE SWITCHES
+! 94: left Alt
+! keycode 64 = Mode_switch              
+!
+! 108: right Alt
+! keycode 108 = Mode_switch
+!
+! 94: chevron key <>
+keycode 94 = Mode_switch
+! ! ! ! ! ! ! ! ! ! ! ! !
+
+! ! ! ! ! ! ! ! ! ! ! ! ! 
+! é
+keycode 11 = 2 at eacute
+! è
+keycode 16 = 7 ampersand egrave
+! 
+keycode 17 = 8 asterisk
+! ç
+keycode 18 = 9 parenleft ccedilla
+! à
+keycode 19 = 0 parenright agrave
+! °
+keycode 20 = minus underscore degree
+! €
+keycode 21 = equal plus EuroSign
+! left-handed return
+keycode 23 = Tab Return Return
+! ê
+keycode 26 = e E ecircumflex
+! ~
+keycode 28 = t T asciitilde
+! û
+keycode 30 = u U ucircumflex
+! î
+keycode 31 = i I icircumflex
+! ô
+keycode 32 = o O ocircumflex
+! â
+keycode 38 = a A acircumflex
+! ù
+keycode 48 = apostrophe quotedbl ugrave
+! ²
+keycode 49 = grave asciitilde twosuperior
+! µ
+keycode 51 = backslash bar mu
+! ç
+keycode 54 = c C ccedilla
+! »
+keycode 59 = comma less guillemotleft
+! «
+keycode 60 = period greater guillemotright
+! §
+keycode 61 = slash question section
+! caps_lock = two-way delete
+keycode 66 = BackSpace Delete Delete
+
+! xmonad: numpad workspaces
+keycode 79 = 7 
+keycode 80 = 8 
+keycode 81 = 9 
+keycode 85 = 6 
+keycode 87 = 1 
+keycode 88 = 2 
+keycode 89 = 3 
+keycode 83 = 4 
+keycode 84 = 5 
+
+! Make Home / End
+keycode 110 = Home NoSymbol End
