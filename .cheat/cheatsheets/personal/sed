@@ -1,0 +1,19 @@
+# sed *Stream EDitor*   takes STDIN & STDOUT and alter
+# Typical Substitution (s) Global (g) 
+# Use ANY single byte delimiter you want, -i -e order
+sed -i 's~/home/devid~$HOME~g' filename
+
+
+# Remove all lines starting with # in VIM (delete instead of substitution)
+:g/^#/d
+# Add comment at the start of all currently selected lines
+:'<,'>s/^/# /
+
+
+:%                #to current file
+:%s/\~/\$HOME/g     #substitution globale
+
+# Recursively replace all occurences starting at pwd
+find . -type f -exec sed -i 's|localhost:8000|api-gateway:8000|g' {} +
+
+

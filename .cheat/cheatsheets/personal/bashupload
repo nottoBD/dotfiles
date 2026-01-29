@@ -1,0 +1,5 @@
+
+# Upload up to 50 Gb, available 3 days
+curl bashupload.com -T your_file.txt
+
+

@@ -1,0 +1,3 @@
+# executes a command at regular intervals and updates its output 
+watch -d ls
+

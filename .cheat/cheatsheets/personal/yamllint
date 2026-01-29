@@ -1,0 +1,2 @@
+>Verify config syntax
+yamllint ~/.config/cheat/conf.yml

@@ -1,0 +1,5 @@
+# wifi device name (phy0)
+sudo iw list | grep -A5 "Wiphy"
+
+# create v-interfaces cfr. 'cheat ip'
+sudo iw phy phy0 interface add {ip_namespace} type managed

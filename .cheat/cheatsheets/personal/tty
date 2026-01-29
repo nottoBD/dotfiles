@@ -1,0 +1,12 @@
+# Write to tty 
+echo "Hello, TTY!" > /dev/tty
+
+# Determine specific terminal ID
+tty
+# e.g. /dev/pts/2
+
+# Send text to specific terminal
+echo "LOL" > /dev/pts/2
+
+# (facultative) Listen on a specific terminal
+cat < /dev/pts/2

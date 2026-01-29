@@ -1,0 +1,11 @@
+# Recursively look for dir & file names starting from pwd
+find . -name '*phil*' \( -type d -o -type f \)
+
+# Efficient file searching with grep context
+sudo find / -name "*ipterm-1_eth0_to_Router1_FastEthernet00*" -type f 2>/dev/null | grep -i gns3
+
+# Looks for content in small non binaries
+sudo find / -type f -size -1M -exec grep -sIl -- "QT_STYLE_OVERRIDE" {} + 2>/dev/null
+
+# Remove all Python files recursively
+find -name '*.py' -delete

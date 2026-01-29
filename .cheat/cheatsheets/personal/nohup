@@ -1,0 +1,2 @@
+# detaches the process from the terminal, allowing it to continue even if the terminal is closed.
+nohup bash -c 'sleep 7200 && systemctl suspend' &

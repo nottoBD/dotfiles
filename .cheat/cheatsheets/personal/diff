@@ -1,0 +1,2 @@
+# compare the output of two commands: <(...) process substitution
+diff <(ls -1 /path/to/dir1 | sort) <(ls -1 /path/to/dir2 | sort)

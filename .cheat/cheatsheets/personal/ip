@@ -1,0 +1,4 @@
+# create namespace
+ip netns add ns_wifi2
+
+

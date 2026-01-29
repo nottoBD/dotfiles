@@ -1,0 +1,4 @@
+# Edit a script in the PATH quickly
+```
+vim $(which wifi-status)
+```

@@ -1,0 +1,41 @@
+# Download a Single Page + All Elements (Non-Recursive)
+wget \
+  --page-requisites \     # Download assets (images, CSS, JS)
+  --convert-links \       # Fix links for offline viewing
+  --adjust-extension \    # Ensure .html extensions
+  --no-parent \           # Don’t ascend to parent directories
+  --no-directories \      # Save all files to one folder
+  --reject "index.html*" \# Skip index pages
+  --user-agent="Mozilla" \# Pretend to be a browser (avoid blocks)
+  https://example.com/specific-page
+
+
+# Download an Entire Website (Recursive)
+wget \
+  --mirror \              # Recursive download (equivalent to -r -N -l inf)
+  --page-requisites \     # Download assets (images, CSS, JS)
+  --convert-links \       # Fix links for offline viewing
+  --adjust-extension \    # Ensure .html extensions
+  --no-parent \           # Don’t ascend to parent directories
+  --user-agent="Mozilla" \# Pretend to be a browser (avoid blocks)
+  --wait=2 \              # Wait 2 seconds between requests (be polite)
+  --limit-rate=1M \       # Limit download speed to 1MB/s
+  --random-wait \         # Randomize wait time between requests
+  --execute robots=off \ # Ignore robots.txt rules
+  https://example.com
+
+#   Common Flags
+# Flag	Description
+# --page-requisites	Download assets (images, CSS, JS) needed to render the page.
+# --convert-links	Fix links in downloaded files for local viewing.
+# --adjust-extension	Ensure files have proper extensions (e.g., .html).
+# --no-parent	Prevent ascending to parent directories.
+# --no-directories	Save all files to one folder (no subdirectories).
+# --reject "index.html*"	Skip downloading auto-generated index pages.
+# --user-agent="Mozilla"	Pretend to be a browser to avoid being blocked.
+# --mirror	Recursively download the entire site (equivalent to -r -N -l inf).
+# --wait=2	Wait 2 seconds between requests to avoid overloading the server.
+# --limit-rate=1M	Limit download speed to 1MB/s.
+# --random-wait	Randomize wait time between requests.
+# --execute robots=off	Ignore robots.txt rules (use with caution).
+# --spider	Test what wget would download without actually downloading.

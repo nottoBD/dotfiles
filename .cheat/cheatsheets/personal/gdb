@@ -1,0 +1,13 @@
+# Quit 
+q
+
+# Open 
+gdb ./binary
+
+# Matrix mode
+Disassemble shell
+
+# See a target
+print shell
+# Oopsie Daisy
+objdump -t ./binary | grep shell

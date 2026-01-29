@@ -1,0 +1,14 @@
+hostnamectl
+#  Static hostname: nitro
+#        Icon name: computer-laptop
+#          Chassis: laptop 💻
+#       Machine ID: 2ef42c1a39724a0896a807a3fb1405b2
+#          Boot ID: 2db2d4b2fc794f508c062ba88484a9fe
+# Operating System: Arch Linux
+#           Kernel: Linux 6.13.8-arch1-1
+#     Architecture: x86-64
+#  Hardware Vendor: Acer
+#   Hardware Model: Nitro AN515-55
+# Firmware Version: V2.03
+#    Firmware Date: Tue 2021-03-23
+#     Firmware Age: 4y 6d

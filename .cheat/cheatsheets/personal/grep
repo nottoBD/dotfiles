@@ -1,0 +1,5 @@
+# Look for a string recursively in several locations
+sudo grep -rl "nm-applet" /etc /usr ~/.config
+
+# Search for 2 terms 
+grep -E "sd|pc" .bash/aliases

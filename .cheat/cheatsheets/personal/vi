@@ -1,0 +1,2 @@
+# Kill TTY
+set -o vi

@@ -1,0 +1,2 @@
+# Download files to local user, during SSH remote shell
+scp "$1" devid@$(echo $SSH_CLIENT | awk '{print $1}'):/home/devid/

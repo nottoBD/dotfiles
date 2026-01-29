@@ -1,0 +1,6 @@
+# >/dev/null is a redirection operator in Unix/Linux shells that discards error messages. 
+# Redirect only the errors: 2>/dev/null
+# Redirect only normal output: >/dev/null
+# Redirect both: >/dev/null 2>&1
+find / -name "zathurarc" 2>/dev/null
+

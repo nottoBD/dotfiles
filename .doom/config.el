@@ -59,7 +59,7 @@
 
 (setq display-line-numbers-type t)   ;; Turn line numbers on
 (setq confirm-kill-emacs nil)        ;; Don't confirm on exit
-(setq initial-buffer-choice 'eshell) ;; Eshell is initial buffer
+
 
 ;; Whenever you reconfigure a package, make sure to wrap your config in an
 ;; `after!' block, otherwise Doom's defaults may override your settings. E.g.
@@ -139,8 +139,6 @@
 
 ;; pdf remember
 (save-place-mode 1)
-(setq pdf-view-save-cache t)
-(add-hook 'kill-emacs-hook #'pdf-view-save-cache)
 
 
 (setq select-enable-clipboard t)   ;; sync Emacs kill-ring ↔ system clipboard
@@ -201,6 +199,13 @@
 (after! projectile
   (setq projectile-auto-discover nil)
   (projectile-add-known-project "~/org")
+  (projectile-add-known-project "~/.config/doom/")
   (setq projectile-project-search-path '("~/.projects/" "~/org/"))
   (setq projectile-require-project-root nil)
   )
+
+(after! pdf-tools
+  (require 'saveplace-pdf-view))
+
+(after! org-superstar
+  (setq org-superstar-headline-bullets-list '("⊙" "◉" "◎" "○" "❍" "◍" "◦")))

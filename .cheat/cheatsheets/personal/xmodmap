@@ -1,0 +1,2 @@
+# see actions of 133 or 135 keycodes
+xmodmap -pke | grep -E '133|135'
