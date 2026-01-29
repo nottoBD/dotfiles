@@ -1,0 +1,24 @@
+# mount timeshift exclusive drive endrypted via luks2
+sudo cryptsetup open /dev/nvme1n1p1 timeshift_crypt
+
+
+### LUKS ENCRYPTION STATUS ###
+# View encryption status
+sudo cryptsetup status timeshift_crypt
+
+# View detailed LUKS header info
+sudo cryptsetup luksDump /dev/nvme1n1p1
+
+### MANUAL MOUNTING/UNMOUNTING ###
+# Close encrypted drive
+sudo umount /mnt/timeshift
+sudo cryptsetup close timeshift_crypt
+
+# Open with key file (automatic)
+sudo cryptsetup open --key-file /root/.keys/timeshift.key /dev/nvme1n1p1 timeshift_crypt
+sudo mount /dev/mapper/timeshift_crypt /mnt/timeshift
+
+# Open with passphrase (backup method)
+sudo cryptsetup open /dev/nvme1n1p1 timeshift_crypt
+sudo mount /dev/mapper/timeshift_crypt /mnt/timeshift
+

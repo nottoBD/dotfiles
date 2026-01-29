@@ -1,0 +1,5 @@
+
+# one liner file content
+cat << 'EOF' > ~/TRASH
+     YOUR SHIT HERE
+EOF

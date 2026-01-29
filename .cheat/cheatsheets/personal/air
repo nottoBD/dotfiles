@@ -1,0 +1,5 @@
+# Go auto rebuild
+
+# pass debug mode flag to program
+air -- -debug
+

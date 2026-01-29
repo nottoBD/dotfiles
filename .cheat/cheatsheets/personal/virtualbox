@@ -1,0 +1,2 @@
+# increase vdi size to 30G
+VBoxManage modifymedium "linfo2347-2-disk001.vdi" --resize 30720

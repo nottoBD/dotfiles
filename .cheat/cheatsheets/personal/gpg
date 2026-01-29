@@ -1,0 +1,2 @@
+# Export GPG public id key
+gpg --armor --export F12382BBA5604F9C1781BA21332971AAE7B0FDB9 > public_gpg.asc

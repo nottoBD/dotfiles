@@ -1,0 +1,9 @@
+# Step 1: Unmount the USB Drive
+sudo umount /dev/sda*
+
+# Step 2: Write the ISO to USB with dd
+sudo dd if=./cachyos-desktop-linux-250530.iso of=/dev/sda bs=4M status=progress oflag=sync
+
+# Step 3: Verify Writes (Optional but Recommended)
+sync  # Flush all buffers
+sudo eject /dev/sda  # Safely eject

@@ -1,0 +1,2 @@
+# Enter the virtual filesystem
+~/cowrie/bin/fsctl ~/cowrie/src/cowrie/data/fs.pickle

@@ -31,7 +31,7 @@ import qualified Data.Map as M
 import XMonad.Hooks.DynamicLog (dynamicLogWithPP, wrap, xmobarPP, xmobarColor, shorten, PP(..))
 import XMonad.Hooks.EwmhDesktops  -- for some fullscreen events, also for xcomposite in obs.
 import XMonad.Hooks.ManageDocks (avoidStruts, docks, manageDocks, ToggleStruts(..))
-import XMonad.Hooks.ManageHelpers (isDialog, isFullscreen, doFullFloat, doCenterFloat)
+import XMonad.Hooks.ManageHelpers (isDialog, isFullscreen, doFullFloat, doCenterFloat, doRectFloat)
 import XMonad.Hooks.ServerMode
 import XMonad.Hooks.SetWMName
 import XMonad.Hooks.StatusBar
@@ -448,7 +448,8 @@ myManageHook = composeAll
   , className =? "toolbar"            --> doFloat
   , className =? "python3"            --> doFloat
   , className =? "pavucontrol"        --> doCenterFloat
-  , className =? "Yad"                --> doCenterFloat
+  , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.002 0.15 0.2 0.45)
+  , className =? "Yad"                --> doCenterFloat 
   , resource =? "crx_nngceckbapebfimnlniiiahkandclblb"   --> doFloat
 --  , className =? "zen-browser" <&&> liftM (== Just (500, 495)) minSize --> doCenterFloat
   , className =? "zen-browser" <&&> title =? "Bitwarden \x2014 Zen Browser" --> doCenterFloat
@@ -458,7 +459,7 @@ myManageHook = composeAll
   , title =? "emacs-run-launcher" --> doFloat
   --, className =? "brave"   --> doShift ( myWorkspaces !! 1 )
   , className =? "mpv"             --> doShift ( myWorkspaces !! 7 )
-  , className =? "steam"             --> doShift ( myWorkspaces !! 1 )
+  , className =? "steamwebhelper"             --> doShift ( myWorkspaces !! 1 )
   , className =? "FreeTube" --> doShift  ( myWorkspaces !! 7 )
   , className =? "vmware" --> doShift  ( myWorkspaces !! 4 )
   , className =? "corectrl" --> doShift  ( myWorkspaces !! 8 )
@@ -504,7 +505,8 @@ myKeys c =
   , ("M-S-a", addName "Kill all windows on WS" $ killAll)
   , ("M-S-<Return>", addName "Run prompt"      $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn "PATH='$PATH' dmenu_path | dmenu_run -c -bw 2 -l 20 -g 4"])
   , ("M-S-b", addName "Toggle bar show/hide"   $ sendMessage ToggleStruts)
-  , ("M-/", addName "DTOS Help"                $ spawn "dtos-help")]
+  , ("M-/", addName "DTOS Help"                $ spawn "dtos-help")
+  , ("M-<F2>", addName "Dmenu Helpers"         $ spawn "dm-helpers")]
 
   ^++^ subKeys "Switch to workspace"
   [ ("M-1", addName "Switch to workspace 1"    $ (windows $ W.greedyView $ myWorkspaces !! 0))
@@ -655,9 +657,7 @@ myKeys c =
   , ("<XF86Calculator>", addName "Calculator"         $ runOrRaise "qalculate-gtk" (resource =? "qalculate-gtk"))
   , ("<XF86Eject>", addName "Eject /dev/cdrom"        $ spawn "eject /dev/cdrom")
   , ("<XF86TouchpadToggle>", addName "Toggle Touchpad"        $ spawn "$HOME/.local/bin/toggle-touchpad && $HOME/.local/bin/x-settings")
-  --, ("<Print>", addName "Take screenshot (dmscripts)" $ spawn "dm-maim")
-  --, ("<F8>", addName "Toggle audio output" $ spawn "pactl set-sink-port alsa_output.pci-0000_00_1f.3.analog-stereo $(pactl list sinks | grep -A 15 'analog-stereo' | grep 'Active Port' | grep -q 'speaker' && echo 'analog-output-headphones' || echo 'analog-output-speaker'); pactl set-sink-mute alsa_output.pci-0000_00_1f.3.analog-stereo 0; pactl set-sink-volume alsa_output.pci-0000_00_1f.3.analog-stereo 20%")
-  , ("M-<F5>", addName "Toggle Monitor Display" $ spawn "monitor_hotswap")
+
   ]
   -- The following lines are needed for named scratchpads.
     where nonNSP          = WSIs (return (\ws -> W.tag ws /= "NSP"))

@@ -1,0 +1,17 @@
+# see cryptsetup for timeshift luks2 exclusive drive mount
+### TIMESHIFT OPERATIONS ###
+# Create new snapshot
+sudo timeshift --create --comments "your_comment"
+
+# List snapshots
+sudo timeshift --list
+
+# Restore snapshot (interactive)
+sudo timeshift --restore
+
+# life saver 1
+rsync -av --progress --exclude 'timeshift' /run/timeshift/1135319/backup/timeshift/snapshots/2025-03-28_11-00-00/localhost/home/devid/synthesis/ ~/synthesis
+
+### IMPORTANT FILES ###
+# Key file location
+/root/.keys/timeshift.key

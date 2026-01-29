@@ -1,0 +1,2 @@
+# Mount gocrypted to .password-store
+gocryptfs  ~/.dotfiles/.password-store ~/.password-store/

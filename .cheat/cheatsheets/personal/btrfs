@@ -1,0 +1,2 @@
+# Clean-up 
+sudo snapper -c home list | awk 'NR>3 {print $1}' | xargs -r sudo snapper -c home delete --sync

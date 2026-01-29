@@ -1,0 +1,5 @@
+# Use autojump to jump to known directories
+j xmonad
+
+# Check the database
+j --stat

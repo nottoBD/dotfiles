@@ -1,0 +1,13 @@
+# sshfs
+
+>Mount remote directories over SSH as if they were local file systems.
+Requires sshfs and SSH access to the remote server.
+
+# real-time modifications
+sshfs -o ssh_command="ssh -A" [user]@[hostname]:[remote_path] ~/remote/
+
+# unmount 
+fusermount -u [local_mount_point]
+
+# Make a local dir (=pcap) link to remote pc (=devid nitro)
+sshfs devid@192.168.0.183:/home/devid/synthesis/ ~/mnt/mininet-pcap

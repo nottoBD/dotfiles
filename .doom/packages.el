@@ -54,3 +54,4 @@
 (package! consult-notes)         ; fast cross-note search
 (package! grip-mode)             ; live GitHub MD preview (optional)
 (package! pandoc-mode)           ; conversions/exports
+(package! saveplace-pdf-view)

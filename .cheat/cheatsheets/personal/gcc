@@ -1,0 +1,8 @@
+# Compile and run current file while in Vim
+:!bash -ic 'crun "%"'
+
+# crun is a function
+# crun ()
+# {
+#    gcc -std=c99 -pedantic -Wall -Wextra -Werror -Wshadow -Wunused -Wconversion -Wformat=2 -g -O0 "$1" -o "${1%.*}" && "./${1%.*}"
+# }

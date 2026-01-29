@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
 #
-# Script name: dm-helper
+# Script name: dm-helpers
 # Description: Display Org mode cheatsheets (e.g., Doom Emacs keybindings) using pandoc for conversion and yad for display.
 # Dependencies: dmenu, fzf, rofi, pandoc, yad
 
-# Set with the flags "-e", "-u","-o pipefail" cause the script to fail
-# if certain things happen, which is a good thing.  Otherwise, we can
-# get hidden bugs that are hard to discover.
 set -euo pipefail
-
-# shellcheck disable=SC1091
 source ./_dm-helper.sh 2>/dev/null || source _dm-helper.sh 2>/dev/null
-
 source_dmscripts_configs
 
 if configs_are_different; then
@@ -19,16 +13,13 @@ if configs_are_different; then
     sleep 1
 fi
 
-# Directory where Org mode helpers are stored
 HELPERS_DIR="$HOME/org/helpers"
 
 menu() {
-    printf '%s\n' "Quit"
     # List .org files, strip path and extension, sort
     find "$HELPERS_DIR" -maxdepth 1 -type f -name '*.org' -printf '%f\n' | sed 's/\.org$//' | sort
 }
 
-# Functions for sending notification messages
 start_display() {
     notify-send "Starting dm-cheatsheet" "Displaying cheatsheet: $1. 📄"
 }
@@ -60,13 +51,62 @@ main() {
             exit 1
         fi
 
-        # Generate temp HTML file with pandoc
+        # Generate temp HTML file with pandoc, including custom CSS and JS
         temp_html="/tmp/dm-cheatsheet-$choice.html"
-        pandoc -f org -t html "$org_file" -o "$temp_html"
+        pandoc -s -f org -t html "$org_file" -o "$temp_html" \
+          --variable "include-before=<style>$(cat <<EOF
+html { background-color: #282c34; margin: 0; padding: 0; }
+body { font-family: monospace; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px 20px 20px 40px; background-color: #282c34; color: #bbc2cf; }
+h1, h2 { color: #51afef; border-bottom: 1px solid #3f444a; }
+a { color: #51afef; }
+code { color: #c678dd; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+th, td { border: 1px solid #3f444a; padding: 8px; text-align: left; }
+th { background-color: #21242b; }
+pre { background-color: #21242b; padding: 10px; border-radius: 4px; color: #bbc2cf; }
+EOF
+)</style><script>$(cat <<EOF
+let lastKey = '';
+let lastKeyTime = 0;
+
+document.addEventListener('keydown', function(e) {
+  const scrollAmount = 50;
+  const halfPage = window.innerHeight / 2;
+
+  if (e.ctrlKey) {
+    switch (e.key.toLowerCase()) {
+      case 'u': e.preventDefault(); window.scrollBy(0, -halfPage); return;
+      case 'd': e.preventDefault(); window.scrollBy(0, halfPage); return;
+    }
+  }
+
+  switch (e.key) {
+    case 'j': e.preventDefault(); window.scrollBy(0, scrollAmount); break;
+    case 'k': e.preventDefault(); window.scrollBy(0, -scrollAmount); break;
+    case 'h': e.preventDefault(); window.scrollBy(-scrollAmount, 0); break;
+    case 'l': e.preventDefault(); window.scrollBy(scrollAmount, 0); break;
+    case 'G': e.preventDefault(); window.scrollTo(0, document.body.scrollHeight); break;
+    case ' ': e.preventDefault(); window.scrollBy(0, halfPage); break;
+    case 'g':
+      if (lastKey === 'g' &amp;&amp; Date.now() - lastKeyTime &lt; 500) {
+        e.preventDefault();
+        window.scrollTo(0, 0);
+        lastKey = '';
+      } else {
+        lastKey = 'g';
+        lastKeyTime = Date.now();
+      }
+      break;
+    default:
+      lastKey = '';
+  }
+});
+EOF
+)</script>"
 
         start_display "$choice"
         # Display with yad (adjust width/height as needed)
-        yad --html --uri="file://$temp_html" --title="$choice Cheatsheet" --width=800 --height=600 --center
+        yad --html --uri="file://$temp_html" --title="$choice Cheatsheet" --width=800 --height=600 --no-buttons
 
         # Clean up temp file
         rm -f "$temp_html"

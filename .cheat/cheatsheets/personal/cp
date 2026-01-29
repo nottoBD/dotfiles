@@ -1,0 +1,3 @@
+# Make backup cp of all in current dir
+for f in *; do cp "$f"{,.bak}; done
+

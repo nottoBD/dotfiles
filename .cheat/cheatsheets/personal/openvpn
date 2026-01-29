@@ -1,0 +1,2 @@
+# Launch with kill switch
+openvpn --config /etc/openvpn/client/nl-free-162.protonvpn.tcp.ovpn --script-security 2 --up /etc/openvpn/client/up --down /etc/openvpn/client/down

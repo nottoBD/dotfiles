@@ -23,7 +23,6 @@ alias c 'bat --number'
 
 alias ls 'exa --color=always --icons -la --git'
 alias tree 'exa --color=always --icons -a --tree'
-alias cheat 'cheat -p personal'
 alias grep 'grep --color=auto'
 alias halt 'poweroff'
 alias lsblk 'lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT,UUID,MODEL,SERIAL'

