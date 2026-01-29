@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Get volume and mute status using wpctl
+output=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)
+
+if [ $? -ne 0 ]; then
+    # Fallback to pactl if wpctl fails
+    VOL=$(pactl get-sink-volume @DEFAULT_SINK@ | awk '{print $5}' | tr -d '%' 2>/dev/null)
+    MUTED=$(pactl get-sink-mute @DEFAULT_SINK@ | awk '{print $2}' 2>/dev/null)
+    
+    if [ "$MUTED" = "yes" ]; then
+        echo "/"
+    else
+        echo "$VOL"
+    fi
+else
+    # Parse wpctl output
+    VOL=$(echo "$output" | awk '{print $2 * 100}' | cut -d. -f1)
+    MUTED=$(echo "$output" | grep -q "MUTED" && echo "MUTED")
+    
+    if [ -n "$MUTED" ]; then
+        echo "/"
+    else
+        echo "$VOL"
+    fi
+fi

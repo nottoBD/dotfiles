@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -z "$DISPLAY" ]; then
+    exit 0
+fi
+
+sleep 1
+
+if [ -f "/home/devid/.xmodmap" ]; then
+    xmodmap /home/devid/.xmodmap
+fi
+
+xset r rate 280 80 2>/dev/null || true
+
+TOUCHPAD_ID=$(xinput | grep -i "Touchpad" | sed -n 's/.*id=\([0-9]*\).*/\1/p')
+if [ -z "$TOUCHPAD_ID" ]; then
+    echo "Error: Touchpad not found."
+    exit 1
+fi
+STATE=$(xinput list-props "$TOUCHPAD_ID" | grep "Device Enabled" | awk '{print $NF}')
+
+NATURAL_SCROLL_PROP="libinput Natural Scrolling Enabled"
+xinput set-prop "$TOUCHPAD_ID" "$NATURAL_SCROLL_PROP" 1
+
+TAPPING_PROP="libinput Tapping Enabled"
+xinput set-prop "$TOUCHPAD_ID" "$TAPPING_PROP" 1
+

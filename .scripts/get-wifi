@@ -1,0 +1,9 @@
+#!/bin/bash
+NETWORK=$(nmcli -t -f ssid,signal dev wifi | awk -F: '{printf "%-30s %s%%\n", $1, $2}' | dmenu -i -p "Select Wi-Fi network:")
+
+SSID=$(echo "$NETWORK" | awk '{print $1}')
+
+[ -z "$SSID" ] && exit
+
+nmcli device wifi connect "$SSID" || notify-send "Wi-Fi Connection" "Failed to connect to $SSID"
+
