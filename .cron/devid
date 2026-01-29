@@ -1,0 +1,1 @@
+*/2 * * * * DISPLAY=:0 XAUTHORITY=/home/devid/.Xauthority feh --bg-fill --randomize /home/devid/media/images/wallpapers/*

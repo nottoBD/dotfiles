@@ -1,0 +1,4 @@
+#!/bin/bash
+cpu=$(top -bn1 | grep "Cpu(s)" | awk '{print int($2)}')
+printf "%02d%%\n" $cpu
+

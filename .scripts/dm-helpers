@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#
+# Script name: dm-helper
+# Description: Display Org mode cheatsheets (e.g., Doom Emacs keybindings) using pandoc for conversion and yad for display.
+# Dependencies: dmenu, fzf, rofi, pandoc, yad
+
+# Set with the flags "-e", "-u","-o pipefail" cause the script to fail
+# if certain things happen, which is a good thing.  Otherwise, we can
+# get hidden bugs that are hard to discover.
+set -euo pipefail
+
+# shellcheck disable=SC1091
+source ./_dm-helper.sh 2>/dev/null || source _dm-helper.sh 2>/dev/null
+
+source_dmscripts_configs
+
+if configs_are_different; then
+    echo "$(date): configs are different" >>"$DM_CONFIG_DIFF_LOGFILE"
+    sleep 1
+fi
+
+# Directory where Org mode helpers are stored
+HELPERS_DIR="$HOME/org/helpers"
+
+menu() {
+    printf '%s\n' "Quit"
+    # List .org files, strip path and extension, sort
+    find "$HELPERS_DIR" -maxdepth 1 -type f -name '*.org' -printf '%f\n' | sed 's/\.org$//' | sort
+}
+
+# Functions for sending notification messages
+start_display() {
+    notify-send "Starting dm-cheatsheet" "Displaying cheatsheet: $1. 📄"
+}
+
+end_display() {
+    notify-send "Stopping dm-cheatsheet" "You have quit dm-cheatsheet. 📄"
+}
+
+main() {
+    # Ensure the helpers directory exists
+    if [ ! -d "$HELPERS_DIR" ]; then
+        notify-send "dm-cheatsheet: Error" "Helpers directory $HELPERS_DIR does not exist."
+        exit 1
+    fi
+
+    # Choosing a cheatsheet from the directory
+    choice=$(menu | ${MENU} 'Choose cheatsheet:') || exit 1
+
+    case $choice in
+    Quit)
+        end_display
+        exit
+        ;;
+    *)
+        # Full path to the Org file
+        org_file="$HELPERS_DIR/$choice.org"
+        if [ ! -f "$org_file" ]; then
+            notify-send "dm-cheatsheet: Error" "File $org_file not found."
+            exit 1
+        fi
+
+        # Generate temp HTML file with pandoc
+        temp_html="/tmp/dm-cheatsheet-$choice.html"
+        pandoc -f org -t html "$org_file" -o "$temp_html"
+
+        start_display "$choice"
+        # Display with yad (adjust width/height as needed)
+        yad --html --uri="file://$temp_html" --title="$choice Cheatsheet" --width=800 --height=600 --center
+
+        # Clean up temp file
+        rm -f "$temp_html"
+        return
+        ;;
+    esac
+}
+
+MENU="$(get_menu_program "$@")"
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main

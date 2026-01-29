@@ -1,0 +1,12 @@
+#!/bin/bash
+STATE="/tmp/update-count"
+
+if [ ! -f "$STATE" ] || [ $(($(date +%s) - $(stat -c %Y "$STATE"))) -gt 600 ]; then
+    pacman_count=$(checkupdates 2>/dev/null | wc -l)
+    aur_count=$(yay -Qua 2>/dev/null | wc -l)
+
+    echo "$pacman_count.$aur_count" > "$STATE"
+fi
+
+cat "$STATE"
+

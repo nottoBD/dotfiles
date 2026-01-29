@@ -1,0 +1,18 @@
+#!/bin/bash
+
+current=$(light -G | awk '{printf("%.0f\n", $1)}')
+
+if [ "$current" -eq 0 ]; then
+    brightness=0
+elif [ "$current" -eq 100 ]; then
+    brightness=100
+elif [ "$current" -gt 0 ] && [ "$current" -lt 1 ]; then
+    brightness=1
+elif [ "$current" -gt 99 ] && [ "$current" -lt 100 ]; then
+    brightness=99
+else
+    brightness=$current
+fi
+
+echo " $brightness"
+
