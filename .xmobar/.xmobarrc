@@ -1,0 +1,71 @@
+Config { font            = "Monocraft Semibold 11"
+       , additionalFonts = [ "Source Code Pro Semibold 12"]
+       , bgColor      = "#282c34"
+       , fgColor      = "#ff6c6b"
+       , position     = TopSize L 100 24
+       , lowerOnStart = True
+       , hideOnStart  = False
+       , allDesktops  = True
+       , persistent   = True
+       , iconRoot     = "/home/devid/.config/xmobar/xpm/"  -- default: "."
+       , commands = [
+                        -- XMONAD
+                      Run UnsafeStdinReader
+
+                        -- PACMAN.YAY
+                    , Run Com "echo" ["<fn=4>\xf0a2</fn>"] "bell" 3600
+                    , Run Com "/home/devid/.local/bin/pacupdate" [] "pacupdate" 1000
+
+                        -- KERNEL
+                    , Run Com "echo" ["<fn=4>\xf21e</fn>"] "heart" 3600
+                    , Run Com "/home/devid/.local/bin/kernel" [] "kernel" 36000
+
+                        -- CPU
+                    , Run Cpu ["-t", "<fn=4>\xf2db</fn> <total>%","-H","50","--high","red"] 20
+                        -- RAM
+                    , Run Memory ["-t", "<fn=4>\xf538</fn> <used>M"] 20
+
+                        -- SSD
+                    , Run DiskU [("/", "<fn=4>\xf0c7</fn> <free>")] [] 20
+
+                        -- WIFI
+                    , Run Com "bash" ["-c", "/home/devid/.local/bin/wifi-status"] "wifi" 100
+                    , Run Com "echo" ["<fn=4>\xf012</fn>"] "wifiicon" 3600
+                    , Run Com "echo" ["<fn=4>\xf1e0</fn>"] "nowifiicon" 3600
+
+                        -- BATTERY
+
+                    , Run Com "echo" ["<fn=4>\xf0e7</fn>"] "baticon" 3600
+                    , Run Com "acpi" ["-b"] "battery" 360
+                    , Run BatteryP ["BAT0"] [
+                          "-t", "<left>% <timeleft>", "--", 
+                          "-O", "" ,          -- charging
+                          "-i", "",           -- charged
+                          "-o", "",           -- unplugged
+                          "-L", "20",         -- low bat
+                          "-H", "80",         -- high bat
+                          "-l", "red",        -- low bat
+                          "-m", "blue",       -- med bat
+                          "-h", "green"
+                          ] 160
+
+                        -- CALENDAR
+                    , Run Com "echo" ["<fn=1>\xf133</fn>"] "calendaricon" 3600
+                    , Run Date "%a %d/%m — %H:%M" "date" 10
+
+                        -- VOLUME
+                    , Run Com "bash" ["-c", "/home/devid/.local/bin/get-volume"] "volume" 5
+                    , Run Com "echo" ["<fn=4>\xf028</fn>"] "volumeicon" 3600
+                    , Run Com "echo" ["<fn=4>\xf026</fn>"] "volumemuteicon" 3600
+
+                        -- BRIGHTNESS
+                    , Run Com "bash" ["-c", "/home/devid/.local/bin/get-brightness"] "brightness" 5
+                    , Run Com "echo" ["<fn=4>\xf185</fn>"] "sun" 3600
+
+                        -- TRAYER
+                    , Run Com "/home/devid/.local/bin/trayer-padding-icon.sh" [] "trayerpad" 50
+                    ]
+       , sepChar = "%"
+       , alignSep = "}{"
+                        -- VOMIT
+       , template = " %UnsafeStdinReader% }{<fn=1><box type=Bottom width=2 mb=2 color=#a74cc1><fc=#a74cc1>%bell% <action=`alacritty -e yay -Syuv`>%pacupdate%</action></fc></box> <box type=Bottom width=2 mb=2 color=#d6384a><fc=#d6384a>%heart% %kernel%</fc></box> <box type=Bottom width=2 mb=2 color=#a1ea52><fc=#a1ea52><action=`alacritty -e bash -c 'setsid missioncenter >/dev/null 2>&1; exit &'`>%cpu%</action></fc></box> <box type=Bottom width=2 mb=2 color=#46d9ff><fc=#46d9ff><action=`alacritty -e bash -c 'setsid missioncenter >/dev/null 2>&1; exit &'`>%memory%</action></fc></box> <box type=Bottom width=2 mb=2 color=#a9a1e1><fc=#a9a1e1>%disku%</fc></box> <box type=Bottom width=2 mb=2 color=#8abc61><fc=#8abc61><action=`/home/devid/.local/bin/dm-wifi`>%wifiicon% %wifi%</action></fc></box> <box type=Bottom width=2 mb=2 color=#fff41f><fc=#fff41f>%baticon% %battery%</fc></box> <box type=Bottom width=2 mb=2 color=#c668dd><fc=#c668dd><action=`alacritty --config-file ~/.config/alacritty/low_zoom.toml -e sh -c 'cal -y | bat; exec sh'`>%calendaricon% %date%</action></fc></box> <box type=Bottom width=2 mb=2 color=#CCCCCC><fc=#CCCCCC><action=`GTK_THEME=Dracula pavucontrol pavucontrol`>%volumeicon%  %volume%</action></fc></box> <box type=Bottom width=2 mb=2 color=#CCCCCC><fc=#CCCCCC><action=brightness-slider>%sun% %brightness%</action></fc></box>%trayerpad%</fn>"

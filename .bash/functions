@@ -1,0 +1,81 @@
+#!/bin/bash
+
+function crun() {
+  gcc -std=c99 -pedantic -Wall -Wextra -Wshadow -Wunused -Wconversion -Wformat=2 -g -O0 "$1" -o "${1%.*}" && "./${1%.*}"
+}
+
+function img() { 
+    if [[ -f $1 ]]; then 
+        mpv --no-terminal --loop-file --image-display-duration=inf "$1" || {
+            tmpfile="/tmp/$(basename "$1").mp4"
+            ffmpeg -y -loop 1 -i "$1" -f lavfi -i anullsrc -shortest -vf format=yuv420p -t 5 "$tmpfile" && mpv "$tmpfile";
+        }
+    else 
+        echo "Error: File '$1' not found."
+    fi 
+}
+
+
+lt() {
+	depth=${1:-2}
+	exa -aT -L $depth --color=always --group-directories-first --icons
+}
+
+unalias ls 2>/dev/null
+function ls() {
+    local target="${1:-.}"
+    if [ -d "$target" ]; then
+        exa -al --color=always --group-directories-first --icons "$target"
+    else
+        command ls "$@"
+    fi
+}
+
+
+cd() {
+	if [ -z "$1" ]; then
+		builtin cd
+	else
+		builtin cd "$1"
+		num_elements=$(exa -al --color=always --group-directories-first | wc -l)
+		if [ "$num_elements" -le 55 ]; then
+			lt 1
+		fi
+	fi
+}
+_bytes () {
+    if [ -z "$1" ]; then
+        echo "Usage: random_clip <number_of_bytes>"
+        return 1
+    fi
+    printf 'A%.0s' $(seq 1 "$1") | xclip -selection clipboard
+}
+
+cp() {
+    local dest="${@: -1}"  # last argument = destination
+    local dest_dir
+
+    # destination ? directory : file
+    if [[ -d "$dest" || "$dest" == */ ]]; then
+        dest_dir="$dest"
+    else
+        dest_dir=$(dirname "$dest")
+    fi
+
+    # destination dir
+    if [[ ! -d "$dest_dir" ]]; then
+        read -p "Directory '$dest_dir' does not exist. Create it? [Y/n] " response
+        case "$response" in
+            [yY]|"" )
+                mkdir -p "$dest_dir" || return 1
+                ;;
+            * )
+                echo "Aborted."
+                return 1
+                ;;
+        esac
+    fi
+
+    command cp "$@"
+}
+

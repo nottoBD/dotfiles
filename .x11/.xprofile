@@ -1,0 +1,6 @@
+# At-Login, Graphic Server-oriented # 
+# # # # # # # # # # # # # # # # # # #
+export QT_QPA_PLATFORMTHEME=qt6ct
+export QT_STYLE_OVERRIDE=kvantum
+export PATH="$PATH:$HOME/.local/bin" #dmenu and xmonad
+
