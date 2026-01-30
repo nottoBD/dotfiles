@@ -1,0 +1,7 @@
+type = scripted
+command = /usr/bin/vmware-networks --start
+stop-command = /usr/bin/vmware-networks --stop
+logfile = /var/log/vmware-networks.log
+restart = true
+smooth-recovery = true
+runs-as = root

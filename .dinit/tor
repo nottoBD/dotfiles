@@ -1,0 +1,7 @@
+type            = process
+command         = /usr/bin/tor -f /etc/tor/torrc --runasdaemon 0
+smooth-recovery = true
+logfile         = /var/log/tor/dinit.log
+depends-on      = network.target
+before          = login.target
+run-as          = tor  

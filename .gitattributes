@@ -1,0 +1,12 @@
+# not git-crypt
+.gitattributes !filter !diff
+.git/git-crypt/** !filter !diff
+
+# directories
+.limine/** filter=git-crypt diff=git-crypt
+.snapper/** filter=git-crypt diff=git-crypt
+.fstab/** filter=git-crypt diff=git-crypt
+
+# .pem
+*.pem filter=git-crypt diff=git-crypt
+

@@ -1,0 +1,6 @@
+type            = process
+command         = /usr/bin/acpid -f
+smooth-recovery = true
+depends-on      = local.target
+before          = login.target
+logfile         = /var/log/dinit/acpid.log

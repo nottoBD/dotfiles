@@ -1,0 +1,5 @@
+type = process
+command = /usr/lib/vmware/hostd/hostd -a
+logfile = /var/log/vmware-hostd.log
+restart = true
+runs-as = root
