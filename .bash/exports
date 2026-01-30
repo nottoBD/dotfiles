@@ -4,6 +4,7 @@ export DOOMDIR="$HOME/.doom.d"
 export EDITOR=nvim
 export GHCUP_USE_XDG_DIRS=1
 export GO111MODULE=on
+export GPG_ID=F12382BBA5604F9C1781BA21332971AAE7B0FDB9
 export GPT_TTY=$(tty)
 export HISTCONTROL=ignorespace
 export HISTFILE=$HOME/.bash/history/history

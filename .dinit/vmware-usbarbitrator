@@ -1,0 +1,6 @@
+type = process
+command = /usr/bin/vmware-usbarbitrator --no-daemon
+logfile = /var/log/vmware-usbarbitrator.log
+restart = true
+smooth-recovery = true
+runs-as = root

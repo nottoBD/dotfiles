@@ -1,0 +1,5 @@
+# /etc/dinit.d/seatd
+type = process
+command = /usr/bin/seatd -g seat
+restart = on-failure
+

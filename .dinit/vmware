@@ -1,0 +1,5 @@
+type = process
+command = /usr/lib/vmware/bin/vmware-vmblock-fuse -o subtype=vmware-vmblock,default_permissions,allow_other /run/vmblock-fuse
+restart = true
+runs-as = root
+logfile = /var/log/vmware-vmblock.log
