@@ -452,7 +452,7 @@ myManageHook = composeAll
   , className =? "Yad"                --> doCenterFloat 
   , resource =? "crx_nngceckbapebfimnlniiiahkandclblb"   --> doFloat
 --  , className =? "zen-browser" <&&> liftM (== Just (500, 495)) minSize --> doCenterFloat
-  , className =? "zen-browser" <&&> title =? "Bitwarden \x2014 Zen Browser" --> doCenterFloat
+  , className =? "zen-browser" <&&> title =? "Bitwarden — Zen Browser" --> doCenterFloat
 
   , title =? "Oracle VM VirtualBox Manager"   --> doFloat
   , title =? "Order Chain - Market Snapshots" --> doFloat
@@ -573,7 +573,7 @@ myKeys c =
   [ ("M-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
   , ("M-alt-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
   , ("M-b", addName "Launch web browser"       $ spawn "zen --new-window https://web.tabliss.io/")
-  , ("M-S-l", addName "Bitwarden Firefox Extension"  $ spawn  "env MOZ_WM_CLASS=\"BitwardenPopup\" zen --no-remote --new-window 'moz-extension://7263733e-1c06-4321-8a0a-3b0e195bbacb/popup/index.html?uilocation=popout#/tabs/current'")
+  , ("M-S-l", addName "Bitwarden Firefox Extension"  $ spawn  "env MOZ_WM_CLASS=\"Bitwarden — Zen Browser\" zen --no-remote --new-window 'moz-extension://7263733e-1c06-4321-8a0a-3b0e195bbacb/popup/index.html?uilocation=popout#/tabs/current'")
   --, ("M-d", addName "Launch Doom Emacs"        $ spawn "emacsclient -c -a '' --eval '(progn (+doom-dashboard/open (selected-frame)))'")
   , ("M-d", addName "Launch Doom Emacs"        $ spawn "emacs")
   , ("M-M1-h", addName "Launch htop"           $ spawn (myTerminal ++ " -e htop"))
