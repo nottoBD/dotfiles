@@ -50,8 +50,16 @@
 (package! go-eldoc)    ; Inline documentation
 (package! gotest)      ; Test runner integration
 (package! exec-path-from-shell)
+(package! ob-typescript)
+(package! reason-mode)
+(package! org-fancy-priorities)
+(package! move-text)
+(package! org-brain)
+(package! prettier-js)
 (package! denote)                ; IDs, backlinks, templates for .md/.org
 (package! consult-notes)         ; fast cross-note search
 (package! grip-mode)             ; live GitHub MD preview (optional)
 (package! pandoc-mode)           ; conversions/exports
 (package! saveplace-pdf-view)
+(package! org-super-agenda)
+(package! org-superstar)

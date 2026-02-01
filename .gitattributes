@@ -3,9 +3,10 @@
 .git/git-crypt/** !filter !diff
 
 # directories
+.fstab/** filter=git-crypt diff=git-crypt
 .limine/** filter=git-crypt diff=git-crypt
 .snapper/** filter=git-crypt diff=git-crypt
-.fstab/** filter=git-crypt diff=git-crypt
+.sudo/** filter=git-crypt diff=git-crypt
 
 # .pem
 *.pem filter=git-crypt diff=git-crypt
