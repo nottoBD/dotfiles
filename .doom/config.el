@@ -1,7 +1,4 @@
-(if (fboundp 'general-auto-unbind-keys)
-    (general-auto-unbind-keys))
-                                        ;(setq debug-on-error t)
-
+(general-auto-unbind-keys)
 
 (setq doom-theme 'doom-one)
 (setq doom-font (font-spec :family "JetBrains Mono" :size 22))
@@ -75,26 +72,27 @@
   (message "📋 Copied selection to clipboard"))
 
 (setq my/notes-root "~/org")
+(setq my/pages-dir (expand-file-name "pages" my/notes-root))
+(setq my/journals-dir (expand-file-name "journals" my/notes-root))
 
-(after! general
-  ;; Keybindings for note creation
-  (map! :leader
-        :desc "New page" "n n"
-        (cmd! (let ((denote-directory my/pages-dir))
-                (call-interactively #'denote)))
-        :desc "New journal entry" "n j"
-        (cmd! (let ((denote-directory my/journals-dir)
-                    (denote-prompts '(title keywords date)))
-                (call-interactively #'denote)))
-        :desc "Search notes" "n s" #'consult-notes
-        :desc "Backlinks" "n b" #'denote-backlinks)
 
-  ;; Bind Ctrl+Shift+C to copy selected region to system clipboard
-  (map! "S-C-c" #'clipboard-kill-ring-save)
+;; Bind Ctrl+Shift+C to copy selected region to system clipboard
+(map! "S-C-c" #'clipboard-kill-ring-save)
 
-  ;; Bind Ctrl+Shift+V to paste from system clipboard
-  (map! "S-C-v" #'clipboard-yank))
+;; Bind Ctrl+Shift+V to paste from system clipboard
+(map! "S-C-v" #'clipboard-yank)
 
+;; Keybindings for note creation
+(map! :leader
+      :desc "New page" "n n"
+      (cmd! (let ((denote-directory my/pages-dir))
+              (call-interactively #'denote)))
+      :desc "New journal entry" "n j"
+      (cmd! (let ((denote-directory my/journals-dir)
+                  (denote-prompts '(title keywords date)))
+              (call-interactively #'denote)))
+      :desc "Search notes" "n s" #'consult-notes
+      :desc "Backlinks" "n b" #'denote-backlinks)
 ;; Org-roam integration
 (after! org-roam
   (setq org-roam-directory (expand-file-name "org" my/notes-root))
@@ -155,31 +153,35 @@
 ;;         :leader
 ;;         :desc "Org Noter" "m n" #'org-noter))
 
-(setq org-agenda-custom-comman(setq org-capture-templates
-                                    '(("s" "Study Note" entry (file+headline "~/org/study/inbox.org" "Notes")
-                                       "* %^{Title}\n%?")))
+(setq org-agenda-custom-commands
+      '(("n" "My Custom Agenda" ;; Example custom command; customize as needed
+         ((agenda "" ((org-agenda-span 7)))
+          (todo "TODO" ((org-agenda-overriding-header "Tasks")))))))
+
+(setq org-capture-templates
+      '(("s" "Study Note" entry (file+headline "~/org/study/inbox.org" "Notes")
+         "* %^{Title}\n%?")))
+
+(after! spell-fu  ; Doom's spell module uses spell-fu under the hood
+  (setq ispell-program-name "hunspell")  ; Switch to hunspell
+  (setq ispell-dictionary "en_US")       ; Default dict; add multiples like "en_US,fr_FR"
+  (setq ispell-personal-dictionary "~/.config/doom/hunspell_personal.dict")  ; Custom words file
+  (setq ispell-alternate-dictionary "/usr/share/dict/words"))  ; Fallback plain list
 
 
-      (after! spell-fu  ; Doom's spell module uses spell-fu under the hood
-        (setq ispell-program-name "hunspell")  ; Switch to hunspell
-        (setq ispell-dictionary "en_US")       ; Default dict; add multiples like "en_US,fr_FR"
-        (setq ispell-personal-dicaionary "~/.config/doom/hunspell_personal.dict")  ; Custom words file
-        (setq ispell-alternate-dictionary "/usr/share/dict/words"))  ; Fallback plain list
+(after! org
+  (add-to-list 'org-file-apps
+               '("\\.pdf\\'" . (let ((file (expand-file-name path)))
+                                 (if (file-exists-p file)
+                                     (progn
+                                       (find-file-other-window file)  ; opens in vertical split by default
+                                       (pdf-view-mode))           ; ensure mode activates
+                                   (message "File not found: %s" file)))))
+  ;; Optional: make RET / C-c C-o always split vertically
+  (setq org-link-frame-setup '((file . find-file-other-window))))
 
 
-      (after! org
-        (add-to-list 'org-file-apps
-                     '("\\.pdf\\'" . (let ((file (expand-file-name path)))
-                                       (if (file-exists-p file)
-                                           (progn
-                                             (find-file-other-window file)  ; opens in vertical split by default
-                                             (pdf-view-mode))           ; ensure mode activates
-                                         (message "File not found: %s" file)))))
-        ;; Optional: make RET / C-c C-o always split vertically
-        (setq org-link-frame-setup '((file . find-file-other-window))))
+(setq split-height-threshold nil)          ; prefer vertical over horizontal
 
-
-      (setq split-height-threshold nil)          ; prefer vertical over horizontal
-
-      (after! pdf-view
-        (add-hook 'pdf-view-mode-hook #'evil-emacs-state))
+(after! pdf-view
+  (add-hook 'pdf-view-mode-hook #'evil-emacs-state))
