@@ -463,6 +463,7 @@ myManageHook = composeAll
   , className =? "Audacious"             --> doShift ( myWorkspaces !! 7 )
   , className =? "zen-browser"             --> doShift ( myWorkspaces !! 2 )
   , className =? "steam"             --> doShift ( myWorkspaces !! 1 )
+  --, className =? "cs2"             --> doShift ( myWorkspaces !! 0 )
   , className =? "FreeTube" --> doShift  ( myWorkspaces !! 7 )
   , className =? "vmware" --> doShift  ( myWorkspaces !! 4 )
   , className =? "corectrl" --> doShift  ( myWorkspaces !! 8 )
