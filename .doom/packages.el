@@ -63,3 +63,4 @@
 (package! saveplace-pdf-view)
 (package! org-super-agenda)
 (package! org-superstar)
+(package! org-noter-pdftools)
