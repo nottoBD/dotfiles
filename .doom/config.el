@@ -6,9 +6,9 @@
 
 
 (setq org-directory "~/org/"  ; Base dir for all Org files
-      org-agenda-files (list "~/org/study/")  ; Agenda scans here—add more paths as needed
-      org-noter-notes-search-path '("~/org/study/notes/")  ; Where PDF notes live
-      org-default-notes-file "~/org/study/inbox.org"  ; Quick capture lands here
+      org-agenda-files (list "~/org/school/")  ; Agenda scans here—add more paths as needed
+      org-noter-notes-search-path '("~/org/school/")  ; Where PDF notes live
+      org-default-notes-file "~/org/school/inbox.org"  ; Quick capture lands here
       org-log-done 'time  ; Timestamp when you complete tasks
       org-startup-folded t)  ; Start files folded for clean overviews
 
@@ -159,8 +159,13 @@
           (todo "TODO" ((org-agenda-overriding-header "Tasks")))))))
 
 (setq org-capture-templates
-      '(("s" "Study Note" entry (file+headline "~/org/study/inbox.org" "Notes")
+      '(("s" "Study Note" entry (file+headline "~/org/school/inbox.org" "Notes")
          "* %^{Title}\n%?")))
+
+(use-package! org-noter-pdftools
+  :after org-noter
+  :config
+  (require 'org-noter-pdftools))
 
 (after! spell-fu  ; Doom's spell module uses spell-fu under the hood
   (setq ispell-program-name "hunspell")  ; Switch to hunspell
@@ -169,19 +174,59 @@
   (setq ispell-alternate-dictionary "/usr/share/dict/words"))  ; Fallback plain list
 
 
-(after! org
-  (add-to-list 'org-file-apps
-               '("\\.pdf\\'" . (let ((file (expand-file-name path)))
-                                 (if (file-exists-p file)
-                                     (progn
-                                       (find-file-other-window file)  ; opens in vertical split by default
-                                       (pdf-view-mode))           ; ensure mode activates
-                                   (message "File not found: %s" file)))))
-  ;; Optional: make RET / C-c C-o always split vertically
-  (setq org-link-frame-setup '((file . find-file-other-window))))
+;; (after! org
+;;   (add-to-list 'org-file-apps
+;;                '("\\.pdf\\'" . (let ((file (expand-file-name path)))
+;;                                  (if (file-exists-p file)
+;;                                      (progn
+;;                                        (find-file-other-window file)  ; opens in vertical split by default
+;;                                        (pdf-view-mode))           ; ensure mode activates
+;;                                    (message "File not found: %s" file)))))
+;;   ;; Optional: make RET / C-c C-o always split vertically
+;;   (setq org-link-frame-setup '((file . find-file-other-window))))
 
 
 (setq split-height-threshold nil)          ; prefer vertical over horizontal
 
 (after! pdf-view
   (add-hook 'pdf-view-mode-hook #'evil-emacs-state))
+
+(after! org-noter
+  (defun my/org-noter-pdf-left ()
+    "Start org-noter session with PDF on the left, notes on the right."
+    (interactive)
+    (org-noter)
+    (when (= 2 (count-windows))
+      (window-swap-states (frame-first-window) (cadr (window-list nil 'no-minibuf)))))
+
+  ;; Optional: make PDF window wider (60% of frame)
+  (setq org-noter-doc-split-fraction '(0.6 . 0.5))
+
+  ;; Ensure horizontal (side-by-side) split
+  (setq org-noter-notes-window-location 'horizontal-split))
+
+(after! org
+  ;; Ensure plain .pdf and .pdf::page links open in Emacs with pdf-tools
+  (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs))
+  (add-to-list 'org-file-apps '("\\.pdf::[0-9]+\\'" . emacs))
+
+  ;; Evil-friendly bindings for opening links
+  (map! :map org-mode-map
+        :n "RET" #'org-open-at-point
+        :n "gf"  #'org-open-at-point)  ; like Vim's gf for "go to file"
+
+  ;; Org-noter keybindings
+  (map! :map org-mode-map
+        :localleader
+        :desc "Org-noter (PDF right)" "n" #'org-noter
+        :desc "Org-noter (PDF left)" "N" #'my/org-noter-pdf-left)
+  )
+
+(after! pdf-view
+  (map! :map pdf-view-mode-map
+        :localleader
+        :desc "Highlight text" "h" #'pdf-annot-add-highlight-markup-annotation))
+(after! org-noter
+  ;; Auto-highlight selected text when inserting note
+  (setq org-noter-highlight-selected-text t))
+

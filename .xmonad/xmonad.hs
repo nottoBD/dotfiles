@@ -449,7 +449,7 @@ myManageHook = composeAll
   , className =? "python3"            --> doFloat
   , className =? "cs2"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
   , className =? "pavucontrol"        --> doCenterFloat
-  , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.002 0.15 0.2 0.45)
+  , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.798 0.25 0.2 0.45)
   , className =? "Yad"                --> doCenterFloat 
   , resource =? "crx_nngceckbapebfimnlniiiahkandclblb"   --> doFloat
 --  , className =? "zen-browser" <&&> liftM (== Just (500, 495)) minSize --> doCenterFloat
