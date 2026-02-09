@@ -77,9 +77,6 @@ import Control.Concurrent (forkIO, threadDelay)
 -- Right handed master pane test
 import XMonad.Layout.Reflect
 
---TEST bitwarden
-import Graphics.X11.Xlib.Extras (SizeHints, getWMNormalHints, sh_min_size)
-import Control.Monad (liftM)
 
 -- Doom One color scheme
 colorScheme = "doom-one"
@@ -419,14 +416,6 @@ myWorkspaceIndices = M.fromList $ zipWith (,) myWorkspaces [1..]
 clickable ws = "<action=xdotool key super+"++show i++">"++ws++"</action>"
     where i = fromJust $ M.lookup ws myWorkspaceIndices
 
--- queries the window's min size from its normal hints. test Bitwarden
-minSize :: Query (Maybe (Dimension, Dimension))
-minSize = do
-  w <- ask
-  liftX $ withDisplay $ \d -> io $ do
-    sh <- getWMNormalHints d w
-    return $ sh_min_size sh
-
 
 myManageHook :: XMonad.Query (Data.Monoid.Endo WindowSet)
 myManageHook = composeAll
@@ -453,7 +442,7 @@ myManageHook = composeAll
   , className =? "Yad"                --> doCenterFloat 
   , resource =? "crx_nngceckbapebfimnlniiiahkandclblb"   --> doFloat
 --  , className =? "zen-browser" <&&> liftM (== Just (500, 495)) minSize --> doCenterFloat
-  , className =? "zen-browser" <&&> title =? "Bitwarden — Zen Browser" --> doCenterFloat
+  --, className =? "zen-browser" <&&> title =? "Bitwarden — Zen Browser" --> doCenterFloat
 
   , title =? "Oracle VM VirtualBox Manager"   --> doFloat
   , title =? "Order Chain - Market Snapshots" --> doFloat
@@ -574,7 +563,7 @@ myKeys c =
   [ ("M-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
   , ("M-alt-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
   , ("M-b", addName "Launch web browser"       $ spawn "zen --new-window https://web.tabliss.io/")
-  , ("M-S-l", addName "Bitwarden Firefox Extension"  $ spawn  "env MOZ_WM_CLASS=\"Bitwarden — Zen Browser\" zen --no-remote --new-window 'moz-extension://7263733e-1c06-4321-8a0a-3b0e195bbacb/popup/index.html?uilocation=popout#/tabs/current'")
+  , ("M-S-l", addName "Bitwarden"  $ spawn  "dbus-run-session -- flatpak run com.bitwarden.desktop &")
   --, ("M-d", addName "Launch Doom Emacs"        $ spawn "emacsclient -c -a '' --eval '(progn (+doom-dashboard/open (selected-frame)))'")
   , ("M-d", addName "Launch Doom Emacs"        $ spawn "emacs")
   , ("M-M1-h", addName "Launch htop"           $ spawn (myTerminal ++ " -e htop"))

@@ -1,0 +1,2 @@
+# Actually trust a key (linux-lqx kernel here)
+sudo pacman-key --recv-keys 9AE4078033F8024D && sudo pacman-key --lsign-key 9AE4078033F8024D

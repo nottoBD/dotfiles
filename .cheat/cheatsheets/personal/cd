@@ -1,0 +1,2 @@
+# cd to newly made dir
+mkdir ~/trash && cd $_
