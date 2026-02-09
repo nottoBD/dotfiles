@@ -1,5 +1,7 @@
 (general-auto-unbind-keys)
 
+(+global-word-wrap-mode +1)
+
 (setq doom-theme 'doom-one)
 (setq doom-font (font-spec :family "JetBrains Mono" :size 22))
 (setq display-line-numbers-type t)
@@ -65,6 +67,8 @@
 (setq select-enable-clipboard t)   ;; sync Emacs kill-ring ↔ system clipboard
 (setq select-enable-primary t)     ;; also sync PRIMARY selection (mouse middle-click paste)
 
+(setq org-modern-star nil)  ; let org-superstar handle bullets only
+
 (defun my/pdf-view-auto-copy (beg end)
   "Automatically copy PDF text selection to clipboard."
   (interactive "r")
@@ -125,8 +129,17 @@
 (after! pdf-tools
   (require 'saveplace-pdf-view))
 
-(after! org-superstar
-  (setq org-superstar-headline-bullets-list '("⊙" "◉" "◎" "○" "❍" "◍" "◦")))
+(use-package! org-superstar
+  :after org
+  :hook (org-mode . org-superstar-mode)
+  :config
+  (setq org-superstar-headline-bullets-list '("⊙" "◉" "◎" "○" "❍" "◍" "◦"))
+  ;; Completely hide any remaining * (clean: just bullet + headline text)
+  (setq org-superstar-remove-leading-stars t)
+  ;; Add 3 spaces before each bullet → headlines no longer touch the left edge
+  (setq org-superstar-leading-bullet "       ")
+  ;; Fallback if needed: (setq org-superstar-leading-fallback ?\s)
+  )
 
 (use-package! org-super-agenda
   :after org-agenda
@@ -173,18 +186,9 @@
   (setq ispell-personal-dictionary "~/.config/doom/hunspell_personal.dict")  ; Custom words file
   (setq ispell-alternate-dictionary "/usr/share/dict/words"))  ; Fallback plain list
 
-
-;; (after! org
-;;   (add-to-list 'org-file-apps
-;;                '("\\.pdf\\'" . (let ((file (expand-file-name path)))
-;;                                  (if (file-exists-p file)
-;;                                      (progn
-;;                                        (find-file-other-window file)  ; opens in vertical split by default
-;;                                        (pdf-view-mode))           ; ensure mode activates
-;;                                    (message "File not found: %s" file)))))
-;;   ;; Optional: make RET / C-c C-o always split vertically
-;;   (setq org-link-frame-setup '((file . find-file-other-window))))
-
+(map! :leader
+      (:prefix "b"
+       :desc "Dashboard" "h" #'+doom-dashboard/open))
 
 (setq split-height-threshold nil)          ; prefer vertical over horizontal
 
@@ -205,23 +209,6 @@
   ;; Ensure horizontal (side-by-side) split
   (setq org-noter-notes-window-location 'horizontal-split))
 
-(after! org
-  ;; Ensure plain .pdf and .pdf::page links open in Emacs with pdf-tools
-  (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs))
-  (add-to-list 'org-file-apps '("\\.pdf::[0-9]+\\'" . emacs))
-
-  ;; Evil-friendly bindings for opening links
-  (map! :map org-mode-map
-        :n "RET" #'org-open-at-point
-        :n "gf"  #'org-open-at-point)  ; like Vim's gf for "go to file"
-
-  ;; Org-noter keybindings
-  (map! :map org-mode-map
-        :localleader
-        :desc "Org-noter (PDF right)" "n" #'org-noter
-        :desc "Org-noter (PDF left)" "N" #'my/org-noter-pdf-left)
-  )
-
 (after! pdf-view
   (map! :map pdf-view-mode-map
         :localleader
@@ -230,3 +217,62 @@
   ;; Auto-highlight selected text when inserting note
   (setq org-noter-highlight-selected-text t))
 
+
+(after! org-noter
+  (advice-add 'org-noter--create-session :after
+              (lambda (doc-buffer notes-buffer _mode _document-property)
+                (with-current-buffer notes-buffer
+                  (visual-line-mode 1)
+                  (when (boundp 'org-indent-mode)
+                    (org-indent-mode 1))))))
+
+(after! org
+  ;; Consolidated settings for reliability
+
+  ;; Priorities (unchanged)
+  (setq org-priority-faces
+        '((?A . (:height 1.30 :weight bold   :foreground "#ff6c6b"))
+          (?B . (:height 1.20 :weight bold   :foreground "#ecbe7b"))
+          (?C . (:height 1.10 :weight normal :foreground "#a0c980"))
+          (?D . (:height 1.00 :weight normal :foreground "#7daea3"))
+          (?E . (:height 1.00 :weight normal :foreground "#6d8dad"))))
+
+  ;; Headline scaling (unchanged)
+  (dolist (pair '((org-level-1 . 1.40)
+                  (org-level-2 . 1.30)
+                  (org-level-3 . 1.20)
+                  (org-level-4 . 1.15)
+                  (org-level-5 . 1.10)
+                  (org-level-6 . 1.05)
+                  (org-level-7 . 1.00)
+                  (org-level-8 . 0.90)))
+    (set-face-attribute (car pair) nil
+                        :height (cdr pair)
+                        :weight 'semi-bold))
+
+  ;; Breathing room (vertical + modern tweaks – unchanged)
+  (setq line-spacing 0.15)
+  (setq org-modern-block-fringe nil
+        org-modern-keyword nil)
+
+  ;; Soft wrapping: reinforce global default
+  (add-hook 'org-mode-hook #'visual-line-mode)
+
+  ;; Indentation activation: enable fully
+  (setq org-hide-leading-stars t)                ; critical for virtual indent to work
+  (setq org-startup-indented t)                  ; files open indented
+  (add-hook 'org-mode-hook #'org-indent-mode)    ; always on in Org buffers
+
+  ;; Stronger per-level space: bump to 6 for obvious change with font size 22
+  (setq org-indent-indentation-per-level 6)      ; try 4-8; adjust as needed
+
+  ;; Other Org settings (e.g., file-apps, maps – unchanged; add more here if scattered)
+  (add-to-list 'org-file-apps '("\\.pdf\\'" . emacs))
+  (add-to-list 'org-file-apps '("\\.pdf::[0-9]+\\'" . emacs))
+  (map! :map org-mode-map
+        :n "RET" #'org-open-at-point
+        :n "gf"  #'org-open-at-point)
+  (map! :map org-mode-map
+        :localleader
+        :desc "Org-noter (PDF right)" "n" #'org-noter
+        :desc "Org-noter (PDF left)" "N" #'my/org-noter-pdf-left))

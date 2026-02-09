@@ -1,0 +1,19 @@
+# requires deno for sig extraction
+# requires cookie 
+
+# Playlist: best video & audio
+yt-dlp --cookies-from-browser brave \
+    -f "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]+bestvideo+bestaudio/best" \
+    --merge-output-format mp4 \
+    --embed-metadata \
+    --embed-chapters \
+    --embed-thumbnail \
+    --embed-subs \
+    -o "%(playlist_title)s/%(playlist_index)02d - %(title)s.%(ext)s" \
+    --ignore-errors \
+    --no-overwrites \
+    --retries infinite \
+    --fragment-retries infinite \
+    --sleep-interval 5 \
+    --yes-playlist \
+    "https://www.youtube.com/playlist?list=PLhXZp00uXBk4np17N39WvB80zgxlZfVwj"
