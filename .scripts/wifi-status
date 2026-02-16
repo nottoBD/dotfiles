@@ -1,0 +1,27 @@
+#!/bin/bash
+SSID=$(iwgetid -r)
+CHANNEL=$(iw dev wlan0 info | grep 'channel' | awk '{print $2}')
+
+if [ -z "$CHANNEL" ]; then
+    BAND=""
+else
+    if [ "$CHANNEL" -le 14 ]; then
+	BAND="(2.4)"
+    elif [ "$CHANNEL" -ge 36 ]; then
+	BAND="(5)"
+    else
+        BAND=""
+    fi
+fi
+
+if [ -n "$SSID" ]; then
+    SSID_SHORT=$(echo "$SSID" | cut -c1-7)
+    CHAR_8=$(echo "$SSID" | cut -c8)
+    if [[ "$CHAR_8" =~ [a-zA-Z0-9] ]]; then
+        SSID_SHORT="$SSID_SHORT$CHAR_8"
+    fi
+else
+    SSID_SHORT="nihil"
+fi
+
+echo "$SSID_SHORT$BAND"

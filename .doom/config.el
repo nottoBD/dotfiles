@@ -18,6 +18,10 @@
 (setq org-modern-table t)
 (add-hook 'org-mode-hook #'hl-todo-mode)
 
+(setq doc-view-continuous t)
+
+(after! pdf-tools
+  (pdf-tools-install :no-query))  ; Auto-build epdfinfo silently if missing
 
 (setq display-line-numbers-type t)   ;; Turn line numbers on
 (setq confirm-kill-emacs nil)        ;; Don't confirm on exit
@@ -107,7 +111,8 @@
   (setq markdown-fontify-code-blocks-natively t))
 
 (use-package! typescript-mode
-  :mode ("\\.tsx\\'" . tsx-ts-mode))  ; Use built-in tsx-ts-mode for .tsx
+  :mode ("\\.tsx\\'" . tsx-ts-mode))
+
 
 (after! tree-sitter
   (add-to-list 'tree-sitter-major-mode-language-alist '(tsx-ts-mode . tsx)))
@@ -180,6 +185,13 @@
   :config
   (require 'org-noter-pdftools))
 
+(add-hook 'buffer-list-update-hook
+          (lambda ()
+            (when (derived-mode-p 'text-mode 'org-mode)
+              (setq truncate-lines nil)
+              (visual-line-mode 1))))
+
+
 (after! spell-fu  ; Doom's spell module uses spell-fu under the hood
   (setq ispell-program-name "hunspell")  ; Switch to hunspell
   (setq ispell-dictionary "en_US")       ; Default dict; add multiples like "en_US,fr_FR"
@@ -217,14 +229,13 @@
   ;; Auto-highlight selected text when inserting note
   (setq org-noter-highlight-selected-text t))
 
-
-(after! org-noter
-  (advice-add 'org-noter--create-session :after
-              (lambda (doc-buffer notes-buffer _mode _document-property)
-                (with-current-buffer notes-buffer
-                  (visual-line-mode 1)
-                  (when (boundp 'org-indent-mode)
-                    (org-indent-mode 1))))))
+(add-hook 'buffer-list-update-hook
+          (lambda ()
+            (when (or (derived-mode-p 'text-mode 'org-mode)
+                      (and (boundp 'org-noter-notes-mode) org-noter-notes-mode))
+              (setq truncate-lines nil)
+              (visual-line-mode 1)
+              (setq word-wrap t))))
 
 (after! org
   ;; Consolidated settings for reliability
@@ -276,3 +287,36 @@
         :localleader
         :desc "Org-noter (PDF right)" "n" #'org-noter
         :desc "Org-noter (PDF left)" "N" #'my/org-noter-pdf-left))
+
+(after! pdf-tools
+  ;; Finer zoom steps (default ~1.25 is jumpy; 1.1 or 1.05 feels smoother)
+  (setq pdf-view-resize-factor 1.1)
+
+  ;; Default display size: fit-width is most readable/centered for notes
+  (setq pdf-view-display-size 'fit-width)
+
+  ;; Auto-fit to width on every PDF open (fixes alignment when org-noter splits windows)
+  (add-hook 'pdf-view-mode-hook #'pdf-view-fit-width-to-window)
+
+  ;; Optional: Dark mode (easier on eyes, especially with slides)
+  (add-hook 'pdf-view-mode-hook #'pdf-view-midnight-minor-mode)
+  (setq pdf-view-midnight-colors '("#ffffff" . "#1e1e1e"))  ; White text on dark bg; tweak as needed
+
+  ;; Optional: Prune off-screen pages for smoother scrolling in long docs
+  ;; (press C-c C-p to toggle manually if you don't want always-on)
+  ;; (add-hook 'pdf-view-mode-hook #'pdf-view-prune-non-facing-pages)
+  )
+
+(after! org
+  (add-hook 'org-mode-hook #'org-fragtog-mode))
+(after! org
+  ;; Force modern SVG backend — eliminates dvipng entirely
+  (setq org-latex-preview-default-process 'dvisvgm)
+  (setq org-latex-preview-process 'dvisvgm);; Optional: nicer scaling and transparency
+  (setq org-latex-preview-options
+        '(:foreground "default"
+          :background "transparent"
+          :scale 1.3
+          :zoom 1.1));; Ensure clean overlays
+  (setq org-latex-preview-appearance-options
+        '(:page-width 0.9)))

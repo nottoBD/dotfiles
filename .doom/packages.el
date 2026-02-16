@@ -65,3 +65,4 @@
 (package! org-superstar)
 (package! org-noter-pdftools)
 (package! ssh-agency)
+(package! org-fragtog)
