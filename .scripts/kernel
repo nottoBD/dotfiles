@@ -1,0 +1,4 @@
+#! /bin/bash 
+
+kern="$(uname -r | awk -F'-' '{print $1}')"
+echo -e "$kern"
