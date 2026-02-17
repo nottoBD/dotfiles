@@ -3,6 +3,7 @@
 (+global-word-wrap-mode +1)
 
 (setq doom-theme 'doom-one)
+(setq evil-respect-visual-line-mode t)
 (setq doom-font (font-spec :family "JetBrains Mono" :size 22))
 (setq display-line-numbers-type t)
 
@@ -297,7 +298,19 @@
 
   ;; Auto-fit to width on every PDF open (fixes alignment when org-noter splits windows)
   (add-hook 'pdf-view-mode-hook #'pdf-view-fit-width-to-window)
-
+  (after! org-noter
+    (add-hook 'org-noter-notes-mode-hook
+              (lambda ()
+                (visual-line-mode 1)
+                (setq-local truncate-lines nil)
+                (setq-local word-wrap t)
+                (+word-wrap-mode 1)))  ; Ensure Doom's wrap mode
+    ;; Optional: Enhance with visual-fill-column for centered/margin wraps
+    (use-package! visual-fill-column
+      :hook (org-noter-notes-mode . (lambda ()
+                                      (visual-fill-column-mode 1)
+                                      (setq visual-fill-column-width 80
+                                            visual-fill-column-center-text t)))))
   ;; Optional: Dark mode (easier on eyes, especially with slides)
   (add-hook 'pdf-view-mode-hook #'pdf-view-midnight-minor-mode)
   (setq pdf-view-midnight-colors '("#ffffff" . "#1e1e1e"))  ; White text on dark bg; tweak as needed

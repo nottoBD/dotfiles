@@ -66,3 +66,4 @@
 (package! org-noter-pdftools)
 (package! ssh-agency)
 (package! org-fragtog)
+(package! visual-fill-column)
