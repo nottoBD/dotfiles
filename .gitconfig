@@ -1,0 +1,23 @@
+[user]
+	name = David LJ Botton
+	email = david.botton@ulb.be
+	signingkey = F12382BBA5604F9C1781BA21332971AAE7B0FDB9
+[http]
+	postBuffer = 524288000
+[init]
+	defaultBranch = master
+[commit]
+	gpgsign = true
+[tag]
+	gpgsign = true
+[gpg]
+	program = gpg
+[pull]
+	rebase = true
+[core]
+	editor = emacs
+	ignorecase = true 
+[color]
+	ui = auto
+[url "git@github.com:"]
+	insteadOf = https://github.com/
