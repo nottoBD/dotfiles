@@ -1,0 +1,4 @@
+#!/bin/bash
+xdotool keyup Shift_L Shift_R Control_L Control_R Alt_L Alt_R Super_L Super_R Hyper_L Hyper_R Meta_L Meta_R Caps_Lock Num_Lock Scroll_Lock
+xdotool keyup 133 36 23 50 37 64 108 105 134 135
+setxkbmap -layout us

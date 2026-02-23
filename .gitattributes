@@ -7,6 +7,7 @@
 .limine/** filter=git-crypt diff=git-crypt
 .snapper/** filter=git-crypt diff=git-crypt
 .sudo/** filter=git-crypt diff=git-crypt
+.zen/** filter=git-crypt diff=git-crypt
 
 # .pem
 *.pem filter=git-crypt diff=git-crypt
