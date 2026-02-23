@@ -1,0 +1,4 @@
+set scroll-step 200
+map ] rotate rotate-cw
+map [ rotate rotate-ccw
+

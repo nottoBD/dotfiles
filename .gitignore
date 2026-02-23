@@ -1,0 +1,10 @@
+*.sqlite
+*.sqlite-*
+*.bin
+*.db
+*.txt
+cookies.*
+favicons.*
+places.*
+storage/
+cache*/
