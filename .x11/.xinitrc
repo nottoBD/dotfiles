@@ -41,6 +41,9 @@ if xrandr --query | grep -q "HDMI-1 connected"; then
 else
     xranddef
 fi
+eval "$(gnome-keyring-daemon --start --components=secrets)"
+export GNOME_KEYRING_CONTROL
+dbus-update-activation-environment --all
 
 exec xmonad
 
