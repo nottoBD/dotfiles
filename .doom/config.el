@@ -139,7 +139,7 @@
   :after org
   :hook (org-mode . org-superstar-mode)
   :config
-  (setq org-superstar-headline-bullets-list '("⊙" "◉" "◎" "○" "❍" "◍" "◦"))
+  (setq org-superstar-headline-bullets-list '("⊙" "◉" "◎" "○" "❍" "◍" "◦" "•" "⁃" "∙"))
   ;; Completely hide any remaining * (clean: just bullet + headline text)
   (setq org-superstar-remove-leading-stars t)
   ;; Add 3 spaces before each bullet → headlines no longer touch the left edge
@@ -217,10 +217,10 @@
       (window-swap-states (frame-first-window) (cadr (window-list nil 'no-minibuf)))))
 
   ;; Optional: make PDF window wider (60% of frame)
-  (setq org-noter-doc-split-fraction '(0.6 . 0.5))
+  (setq org-noter-doc-split-fraction '(0.7 . 0.5))
 
-  ;; Ensure horizontal (side-by-side) split
-  (setq org-noter-notes-window-location 'horizontal-split))
+  ;; Ensure side-by-side split
+  (setq org-noter-notes-window-location 'vertical-split))
 
 (after! pdf-view
   (map! :map pdf-view-mode-map
@@ -241,15 +241,27 @@
 (after! org
   ;; Consolidated settings for reliability
 
-  ;; Priorities (unchanged)
+  ;; Priorities
   (setq org-priority-faces
         '((?A . (:height 1.30 :weight bold   :foreground "#ff6c6b"))
           (?B . (:height 1.20 :weight bold   :foreground "#ecbe7b"))
           (?C . (:height 1.10 :weight normal :foreground "#a0c980"))
           (?D . (:height 1.00 :weight normal :foreground "#7daea3"))
-          (?E . (:height 1.00 :weight normal :foreground "#6d8dad"))))
+          (?E . (:height 1.00 :wei+ght normal :foreground "#6d8dad"))))
 
-  ;; Headline scaling (unchanged)
+  (defface org-level-9
+    '((t (:inherit org-level-1)))
+    "Face used for level 9 headlines."
+    :group 'org-faces)
+
+  (defface org-level-10
+    '((t (:inherit org-level-1)))
+    "Face used for level 10 headlines."
+    :group 'org-faces)
+
+  (setq org-n-level-faces 10)
+
+  ;; Headline scaling
   (dolist (pair '((org-level-1 . 1.40)
                   (org-level-2 . 1.30)
                   (org-level-3 . 1.20)
@@ -257,7 +269,9 @@
                   (org-level-5 . 1.10)
                   (org-level-6 . 1.05)
                   (org-level-7 . 1.00)
-                  (org-level-8 . 0.90)))
+                  (org-level-8 . 0.90)
+                  (org-level-9 . 0.85)
+                  (org-level-10 . 0.80)))
     (set-face-attribute (car pair) nil
                         :height (cdr pair)
                         :weight 'semi-bold))
@@ -304,13 +318,8 @@
                 (visual-line-mode 1)
                 (setq-local truncate-lines nil)
                 (setq-local word-wrap t)
-                (+word-wrap-mode 1)))  ; Ensure Doom's wrap mode
-    ;; Optional: Enhance with visual-fill-column for centered/margin wraps
-    (use-package! visual-fill-column
-      :hook (org-noter-notes-mode . (lambda ()
-                                      (visual-fill-column-mode 1)
-                                      (setq visual-fill-column-width 80
-                                            visual-fill-column-center-text t)))))
+                (+word-wrap-mode 1)
+                (org-indent-mode -1))))  ; Ensure Doom's wrap mode
   ;; Optional: Dark mode (easier on eyes, especially with slides)
   (add-hook 'pdf-view-mode-hook #'pdf-view-midnight-minor-mode)
   (setq pdf-view-midnight-colors '("#ffffff" . "#1e1e1e"))  ; White text on dark bg; tweak as needed
