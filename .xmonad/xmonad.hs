@@ -7,7 +7,7 @@ import System.Exit (exitSuccess)
 import qualified XMonad.StackSet as W
 
     -- Actions
-import XMonad.Actions.CopyWindow (kill1)
+import XMonad.Actions.CopyWindow (kill1, copy, killAllOtherCopies)
 import XMonad.Actions.CycleWS (Direction1D(..), moveTo, shiftTo, WSType(..), nextScreen, prevScreen)
 import XMonad.Actions.GridSelect
 import XMonad.Actions.MouseResize
@@ -512,6 +512,13 @@ myKeys c =
   , ("M-8", addName "Switch to workspace 8"    $ (windows $ W.greedyView $ myWorkspaces !! 7))
   , ("M-9", addName "Switch to workspace 9"    $ (windows $ W.greedyView $ myWorkspaces !! 8))]
 
+  ^++^ subKeys "Cycle non-empty workspaces"
+  [ ("M-`",    addName "Next non-empty workspace" $ moveTo Next nonEmptyNonNSP)
+  , ("M-S-`",  addName "Prev non-empty workspace" $ moveTo Prev nonEmptyNonNSP)]
+
+  ^++^ subKeys "Pinned / Sticky windows"
+  [ ("M-S-p", addName "Toggle pin focused window to non-empty workspaces" $ togglePin)]
+
   ^++^ subKeys "Send window to workspace"
   [ ("M-S-1", addName "Send to workspace 1"    $ (windows $ W.shift $ myWorkspaces !! 0))
   , ("M-S-2", addName "Send to workspace 2"    $ (windows $ W.shift $ myWorkspaces !! 1))
@@ -634,6 +641,11 @@ myKeys c =
   , ("C-M-7", addName "Menu of system apps"     $ spawnSelected' gsSystem)
   , ("C-M-8", addName "Menu of utilities apps"  $ spawnSelected' gsUtilities)]
 
+  ^++^ subKeys "Volume control with Function keys"
+  [ ("<F6>", addName "Toggle audio mute (all sinks)" $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-mute {} toggle")
+  , ("<F7>", addName "Lower volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} -5%")
+  , ("<F8>", addName "Raise volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} +5%")
+  ]
   -- Multimedia Keys
   ^++^ subKeys "Multimedia keys"
   [ ("<XF86AudioPlay>", addName "mocp play"           $ spawn "mocp --play")
