@@ -137,15 +137,17 @@ myStartupHook = do
     safeSpawn "killall" ["blueman-applet"]
     safeSpawn "killall" ["trayer"]
     safeSpawn "killall" ["picom"]
+    safeSpawn "killall" ["volctl"]
 
     liftIO $ threadDelay (2 * 1000000)
 
     safeSpawn "trayer" ["--edge", "top", "--align", "right", "--widthtype", "request", "--padding", "4", "--SetDockType", "true", "--SetPartialStrut", "false", "--expand", "true", "--transparent", "true", "--alpha", "0", "--tint", "0x282c34", "--height", "22", "--monitor", "primary"]
-    spawn $ "bluetoothctl info | grep -q 'Connected: yes' && blueman-applet"
     safeSpawn "dunst" []
     safeSpawn "batsignal" ["-w", "30", "-c", "20", "-d", "10", "-f", "89"]
     safeSpawn "conky" ["-c", "/home/devid/.config/conky/doom-one-01.conkyrc"]
     safeSpawn "picom" []
+    safeSpawn "volctl" []
+    safeSpawn "blueman-applet" []
     spawnOnce "pgrep -x emacs || /usr/bin/emacs --daemon"
 
     spawnOnce "$HOME/.local/bin/x-settings"
@@ -483,6 +485,27 @@ showKeybindings x = addName "Show Keybindings" $ io $ do
   hPutStr h (unlines $ showKmSimple x) -- showKmSimple doesn't add ">>" to subtitles
   hClose h
   return ()
+
+
+-- Toggle pin: copy focused window ONLY to currently non-empty workspaces
+-- (workspaces that already have ≥1 window, excluding NSP).
+-- Floating state is preserved on every copy.
+togglePin :: X ()
+togglePin = do
+    winset <- gets windowset
+    case W.peek winset of
+      Nothing -> return ()
+      Just w  -> do
+        let isCopied ws = w `elem` W.integrate' (W.stack ws)
+            allWS       = W.workspaces winset
+            nonEmptyWS  = filter (\ws -> isJust (W.stack ws) && W.tag ws /= "NSP") allWS
+            numNonEmpty = length nonEmptyWS
+            numCopies   = length $ filter isCopied nonEmptyWS
+
+        if numCopies == numNonEmpty
+          then killAllOtherCopies
+          else mapM_ (windows . copy) (map W.tag nonEmptyWS)
+
 
 myKeys :: XConfig l0 -> [((KeyMask, KeySym), NamedAction)]
 myKeys c =
