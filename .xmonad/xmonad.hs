@@ -600,7 +600,7 @@ myKeys c =
   , ("<Print>", addName "Selection screenshot" $ spawn "maim -s | xclip -selection clipboard -t image/png")
   , ("M-C-v", addName "Primary paste"          $ spawn "xdotool click 1")
   , ("M-v", addName "Selection paste"          $ spawn "$HOME/.local/bin/paste_primary")
-  , ("C-M1-t", addName "Secondary Terminal"    $ spawn "xterm")
+  , ("C-M1-t", addName "Secondary Terminal"    $ spawn "alacritty")
   , ("M-f", addName "Freetube"                 $ spawn "freetube")
   , ("M-n", addName "Thunar"                   $ spawn "thunar")]
 
