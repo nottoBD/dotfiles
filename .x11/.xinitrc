@@ -20,20 +20,21 @@ xset s off
 xset s noblank
 xset r rate 280 80
 
-( pactl set-sink-mute @DEFAULT_SINK@ 1 || true ) &
-( pactl list short sources | grep -vi "monitor" | awk '{print $1}' \
-    | xargs -r -I{} sh -c 'pactl set-source-mute {} 1; pactl set-source-volume {} 0%' || true ) &
+# ( pactl set-sink-mute @DEFAULT_SINK@ 1 || true ) &
+ ( pactl list short sources | grep -vi "monitor" | awk '{print $1}' \
+     | xargs -r -I{} sh -c 'pactl set-source-mute {} 1; pactl set-source-volume {} 0%' || true ) &
 
 brightnessctl -q set 20%
 
-unclutter -idle 1 &
+pgrep -x unclutter >/dev/null || unclutter -idle 1 &
 
-#xidlehook --not-when-audio \
+pgrep -x xidlehook  >/dev/null || xidlehook --not-when-audio \
+  --timer 9500 'loginctl suspend' '' &
 #  --timer 2500 'xtrlock' '' \
-#  --timer 500 'loginctl suspend' '' &
 
-TP_ID="$(xinput list | awk -F'id=' '/[Tt]ouchpad/{print $2}' | awk '{print $1; exit}')"
-[ -n "$TP_ID" ] && xinput disable "$TP_ID"
+# TP_ID="$(xinput list | awk -F'id=' '/[Tt]ouchpad/{print $2}' | awk '{print $1; exit}')"
+# [ -n "$TP_ID" ] && xinput disable "$TP_ID"
+
 
 
 if xrandr --query | grep -q "HDMI-1 connected"; then

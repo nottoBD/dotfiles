@@ -154,7 +154,7 @@ myStartupHook = do
     spawnOnce "numlockx"
 
     spawnOnce "tuxedo-control-center --tray &"
-    spawnOnce "corectrl &"
+    spawnOnce "corectrl --minimize-systray &"
     
 
 
