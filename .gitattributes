@@ -5,6 +5,7 @@
 # directories
 .fstab/** filter=git-crypt diff=git-crypt
 .limine/** filter=git-crypt diff=git-crypt
+.pacman/** filter=git-crypt diff=git-crypt
 .snapper/** filter=git-crypt diff=git-crypt
 .sudo/** filter=git-crypt diff=git-crypt
 .zen/** filter=git-crypt diff=git-crypt

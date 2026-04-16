@@ -82,7 +82,7 @@ main() {
 		;;
 	'Shutdown')
 		if [[ "$(echo -e "No\nYes" | ${MENU} "${choice}?")" == "Yes" ]]; then
-			poweroff
+			loginctl poweroff
 		else
 			output "User chose not to shutdown." && exit 0
 		fi
