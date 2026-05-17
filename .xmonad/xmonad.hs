@@ -71,6 +71,7 @@ import XMonad.Util.NamedActions as NamedActions
 import XMonad.Util.NamedScratchpad
 import XMonad.Util.Run (runProcessWithInput, safeSpawn, spawnPipe)
 import XMonad.Util.SpawnOnce
+import XMonad.Util.Cursor
 
 -- Battery periodic check (TEST)
 import Control.Concurrent (forkIO, threadDelay)
@@ -139,6 +140,7 @@ myStartupHook = do
     safeSpawn "killall" ["trayer"]
     safeSpawn "killall" ["picom"]
     safeSpawn "killall" ["volctl"]
+    safeSpawn "killall" ["xsettingsd"]
 
     liftIO $ threadDelay (2 * 1000000)
 
@@ -150,11 +152,12 @@ myStartupHook = do
     safeSpawn "volctl" []
     safeSpawn "blueman-applet" []
     spawnOnce "pgrep -x emacs || /usr/bin/emacs --daemon"
-
+    spawnOnce "xsettingsd"
     spawnOnce "$HOME/.local/bin/x-settings"
     spawnOnce "numlockx"
 
     spawnOnce "tuxedo-control-center --tray &"
+    spawnOnce "~/.local/bin/phinger-time-daemon"
 -- spawnOnce "corectrl --minimize-systray &"
 
     -- Boot-only apps on specific workspaces (never re-launched on xmonad --restart)
@@ -725,7 +728,7 @@ main = do
     , handleEventHook    = windowedFullscreenFixEventHook <> swallowEventHook (className =? "Alacritty"  <||> className =? "st-256color" <||> className =? "XTerm") (return True) <> trayerPaddingXmobarEventHook
     , modMask            = myModMask
     , terminal           = myTerminal
-    , startupHook        = myStartupHook
+    , startupHook = myStartupHook <> setDefaultCursor xC_left_ptr
     , layoutHook         = showWName' myShowWNameTheme $ myLayoutHook
     , workspaces         = myWorkspaces
     , borderWidth        = myBorderWidth

@@ -1,0 +1,35 @@
+#!/bin/bash
+# ~/.local/bin/phinger-time-daemon.sh
+
+# Light cursor 22:00–06:59, dark otherwise. Checks every 5 minutes.
+
+while true; do
+
+  HOUR=$(date +%H)
+
+  if [ "$HOUR" -ge 22 ] || [ "$HOUR" -lt 7 ]; then
+
+    DESIRED="light"
+
+  else
+
+    DESIRED="dark"
+
+  fi
+
+  # Only switch if needed
+
+  CURRENT=$(grep -oP 'Inherits=\K.*' ~/.icons/default/index.theme 2>/dev/null || echo "phinger-cursors-dark")
+
+  if [[ "$CURRENT" == *dark* && "$DESIRED" == "light" ]] || \
+
+     [[ "$CURRENT" == *light* && "$DESIRED" == "dark" ]]; then
+
+    ~/.local/bin/switch-phinger-cursor "$DESIRED" >/dev/null 2>&1
+
+  fi
+
+  sleep 1200 
+
+done
+
