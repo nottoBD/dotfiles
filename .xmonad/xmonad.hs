@@ -17,6 +17,7 @@ import XMonad.Actions.WindowGo (runOrRaise)
 import XMonad.Actions.WithAll (sinkAll, killAll)
 import XMonad.Actions.UpdatePointer
 import qualified XMonad.Actions.Search as S
+import XMonad.Actions.SpawnOn
 
     -- Data
 import Data.Char (isSpace, toUpper)
@@ -154,7 +155,14 @@ myStartupHook = do
     spawnOnce "numlockx"
 
     spawnOnce "tuxedo-control-center --tray &"
-    spawnOnce "corectrl --minimize-systray &"
+-- spawnOnce "corectrl --minimize-systray &"
+
+    -- Boot-only apps on specific workspaces (never re-launched on xmonad --restart)
+    spawnOnOnce (myWorkspaces !! 0) "emacs"                    -- Doom Emacs → workspace 1
+    spawnOnOnce (myWorkspaces !! 2) "zen"  -- Zen → workspace 3
+    spawnOnOnce (myWorkspaces !! 3) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
+    spawnOnOnce (myWorkspaces !! 7) "freetube"                 -- FreeTube → workspace 8
+    spawnOnce "sleep 2 && until xdotool search --onlyvisible --class zen-browser windowactivate --sync key --clearmodifiers shift+alt+u 2>/dev/null; do sleep 0.8; done"
     
 
 
@@ -444,8 +452,10 @@ myManageHook = composeAll
   , className =? "Yad"                --> doCenterFloat 
   , resource =? "crx_nngceckbapebfimnlniiiahkandclblb"   --> doFloat
 --  , className =? "zen-browser" <&&> liftM (== Just (500, 495)) minSize --> doCenterFloat
-  --, className =? "zen-browser" <&&> title =? "Bitwarden — Zen Browser" --> doCenterFloat
+  , className =? "zen-browser" <&&> title =? "Bitwarden — Zen Browser" --> doCenterFloat
 
+-- Main Zen browser windows go to workspace 3, but dialogs/popups do NOT get shifted
+  , (className =? "zen-browser" <&&> fmap not isDialog) --> doShift (myWorkspaces !! 2)
   , title =? "Oracle VM VirtualBox Manager"   --> doFloat
   , title =? "Order Chain - Market Snapshots" --> doFloat
   , title =? "emacs-run-launcher" --> doFloat
@@ -453,7 +463,6 @@ myManageHook = composeAll
   , className =? "mpv"             --> doShift ( myWorkspaces !! 7 )
   , className =? "Emacs"             --> doShift ( myWorkspaces !! 0 )
   , className =? "Audacious"             --> doShift ( myWorkspaces !! 7 )
-  , className =? "zen-browser"             --> doShift ( myWorkspaces !! 2 )
   , className =? "steam"             --> doShift ( myWorkspaces !! 1 )
   , className =? "FreeTube" --> doShift  ( myWorkspaces !! 7 )
   , className =? "vmware" --> doShift  ( myWorkspaces !! 4 )
@@ -536,8 +545,8 @@ myKeys c =
   , ("M-9", addName "Switch to workspace 9"    $ (windows $ W.greedyView $ myWorkspaces !! 8))]
 
   ^++^ subKeys "Cycle non-empty workspaces"
-  [ ("M-`",    addName "Next non-empty workspace" $ moveTo Next nonEmptyNonNSP)
-  , ("M-S-`",  addName "Prev non-empty workspace" $ moveTo Prev nonEmptyNonNSP)]
+  [ ("M-`",    addName "Next hidden non-empty workspace" $ moveTo Next hiddenNonEmptyNonNSP)
+  , ("M-S-`",  addName "Prev hidden non-empty workspace" $ moveTo Prev hiddenNonEmptyNonNSP)]
 
   ^++^ subKeys "Pinned / Sticky windows"
   [ ("M-S-p", addName "Toggle pin focused window to non-empty workspaces" $ togglePin)]
@@ -675,10 +684,13 @@ myKeys c =
   , ("<XF86AudioPrev>", addName "mocp next"           $ spawn "mocp --previous")
   , ("<XF86AudioNext>", addName "mocp prev"           $ spawn "mocp --next")
   , ("<XF86AudioMute>", addName "Toggle audio mute"   $ spawn "dinitctl start --pin pipewire && dinitctl start --pin pipewire-pulse && dinitctl start --pin wireplumber && amixer set Master toggle")
+  , ("<F6>", addName "Toggle audio mute"   $ spawn "dinitctl start --pin pipewire && dinitctl start --pin pipewire-pulse && dinitctl start --pin wireplumber && amixer set Master toggle")
   , ("<XF86AudioLowerVolume>", addName "Lower vol" $ spawn "pactl set-sink-volume @DEFAULT_SINK@ -5%")
   , ("<XF86AudioRaiseVolume>", addName "Raise vol" $ spawn "pactl set-sink-volume @DEFAULT_SINK@ +5%")
   , ("<XF86MonBrightnessDown>", addName "Decrease brightness" $ spawn "~/.local/bin/brightdown")
   , ("<XF86MonBrightnessUp>",   addName "Increase brightness" $ spawn "~/.local/bin/brightup")
+  , ("<F1>", addName "Decrease brightness" $ spawn "~/.local/bin/brightdown")
+  , ("<F2>",   addName "Increase brightness" $ spawn "~/.local/bin/brightup")
   , ("<XF86HomePage>", addName "Open home page"       $ spawn (myBrowser ++ " https://web.tabliss.io"))
   , ("<XF86Search>", addName "Web search (dmscripts)" $ spawn "dm-websearch")
   , ("<XF86Mail>", addName "Email client"             $ runOrRaise "thunderbird" (resource =? "thunderbird"))
@@ -690,6 +702,15 @@ myKeys c =
   -- The following lines are needed for named scratchpads.
     where nonNSP          = WSIs (return (\ws -> W.tag ws /= "NSP"))
           nonEmptyNonNSP  = WSIs (return (\ws -> isJust (W.stack ws) && W.tag ws /= "NSP"))
+          -- hiddenNonEmptyNonNSP: Only non-empty workspaces that are NOT currently
+          -- visible on *any* monitor (current screen + all other screens).
+          -- This makes M-` / M-S-` skip workspaces already shown on another monitor.
+          hiddenNonEmptyNonNSP = WSIs $ do
+            winset <- gets windowset
+            let visibleTags = map (W.tag . W.workspace) (W.current winset : W.visible winset)
+            return $ \ws -> isJust (W.stack ws)
+                         && W.tag ws /= "NSP"
+                         && W.tag ws `notElem` visibleTags
 
 main :: IO ()
 main = do
@@ -700,7 +721,7 @@ main = do
 --  xmproc2 <- spawnPipe ("xmobar -x 2 $HOME/.config/xmobar/" ++ colorScheme ++ "-xmobarrc")
   -- the xmonad, ya know...what the WM is named after!
   xmonad $ addDescrKeys' ((mod4Mask, xK_F1), showKeybindings) myKeys $ ewmh $ docks $ def
-    { manageHook         = myManageHook <+> manageDocks
+    { manageHook         = myManageHook <+> myManageHook <+> manageDocks
     , handleEventHook    = windowedFullscreenFixEventHook <> swallowEventHook (className =? "Alacritty"  <||> className =? "st-256color" <||> className =? "XTerm") (return True) <> trayerPaddingXmobarEventHook
     , modMask            = myModMask
     , terminal           = myTerminal
