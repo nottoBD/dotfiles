@@ -112,7 +112,7 @@ myTerminal :: String
 myTerminal = "alacritty"
 
 myBrowser :: String
-myBrowser = "zen"
+myBrowser = "zen-browser"
 
 myEditor :: String
 myEditor = myTerminal ++ " -e vim "
@@ -146,7 +146,6 @@ myStartupHook = do
 
     safeSpawn "trayer" ["--edge", "top", "--align", "right", "--widthtype", "request", "--padding", "4", "--SetDockType", "true", "--SetPartialStrut", "false", "--expand", "true", "--transparent", "true", "--alpha", "0", "--tint", "0x282c34", "--height", "22", "--monitor", "primary"]
     safeSpawn "dunst" []
-    safeSpawn "batsignal" ["-w", "30", "-c", "20", "-d", "10", "-f", "89"]
     safeSpawn "conky" ["-c", "/home/devid/.config/conky/doom-one-01.conkyrc"]
     safeSpawn "picom" []
     safeSpawn "volctl" []
@@ -166,6 +165,8 @@ myStartupHook = do
     spawnOnOnce (myWorkspaces !! 3) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
     spawnOnOnce (myWorkspaces !! 7) "freetube"                 -- FreeTube → workspace 8
     spawnOnce "sleep 2 && until xdotool search --onlyvisible --class zen-browser windowactivate --sync key --clearmodifiers shift+alt+u 2>/dev/null; do sleep 0.8; done"
+    spawnOnce "$HOME/.local/bin/x-settings && xset s off -dpms"
+    spawnOnce "numlockx"
     
 
 
@@ -450,6 +451,7 @@ myManageHook = composeAll
   , className =? "toolbar"            --> doFloat
   , className =? "python3"            --> doFloat
   , className =? "cs2"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
+  , className =? "steam_app_2668510"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
   , className =? "pavucontrol"        --> doCenterFloat
   , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.798 0.25 0.2 0.45)
   , className =? "Yad"                --> doCenterFloat 
@@ -467,6 +469,7 @@ myManageHook = composeAll
   , className =? "Emacs"             --> doShift ( myWorkspaces !! 0 )
   , className =? "Audacious"             --> doShift ( myWorkspaces !! 7 )
   , className =? "steam"             --> doShift ( myWorkspaces !! 1 )
+  , className =? "Steam"             --> doShift ( myWorkspaces !! 1 )
   , className =? "FreeTube" --> doShift  ( myWorkspaces !! 7 )
   , className =? "vmware" --> doShift  ( myWorkspaces !! 4 )
   , className =? "corectrl" --> doShift  ( myWorkspaces !! 8 )
@@ -604,10 +607,10 @@ myKeys c =
   ^++^ subKeys "Favorite programs"
   [ ("M-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
   , ("M-alt-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
-  , ("M-b", addName "Launch web browser"       $ spawn "zen --new-window https://web.tabliss.io/")
+  , ("M-b", addName "Launch web browser"       $ spawn "zen-browser --new-window https://web.tabliss.io/")
   , ("M-S-l", addName "Bitwarden"  $ spawn  "dbus-run-session -- flatpak run com.bitwarden.desktop &")
   --, ("M-d", addName "Launch Doom Emacs"        $ spawn "emacsclient -c -a '' --eval '(progn (+doom-dashboard/open (selected-frame)))'")
-  , ("M-d", addName "Launch Doom Emacs"        $ spawn "emacs")
+  , ("M-d", addName "Launch Doom Emacs"        $ spawn "doom run")
   , ("M-M1-h", addName "Launch htop"           $ spawn (myTerminal ++ " -e htop"))
   , ("<Print>", addName "Selection screenshot" $ spawn "maim -s | xclip -selection clipboard -t image/png")
   , ("M-C-v", addName "Primary paste"          $ spawn "xdotool click 1")
