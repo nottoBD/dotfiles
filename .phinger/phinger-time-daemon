@@ -7,13 +7,13 @@ while true; do
 
   HOUR=$(date +%H)
 
-  if [ "$HOUR" -ge 22 ] || [ "$HOUR" -lt 7 ]; then
+  if [ "$HOUR" -ge 21 ] || [ "$HOUR" -lt 7 ]; then
 
     DESIRED="light"
 
   else
 
-    DESIRED="dark"
+#    DESIRED="dark"
 
   fi
 

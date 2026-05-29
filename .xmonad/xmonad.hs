@@ -156,7 +156,7 @@ myStartupHook = do
     spawnOnce "numlockx"
 
     spawnOnce "tuxedo-control-center --tray &"
-    spawnOnce "~/.local/bin/phinger-time-daemon"
+    spawnOnce "$HOME/.local/bin/phinger-time-daemon"
 -- spawnOnce "corectrl --minimize-systray &"
 
     -- Boot-only apps on specific workspaces (never re-launched on xmonad --restart)

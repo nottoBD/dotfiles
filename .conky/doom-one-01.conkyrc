@@ -2,7 +2,43 @@
 ####################################
 ##  doom-one-01.conkyrc (XMonad)  ##
 ####################################
+
+Notes:
+  * Network interface is auto-detected at launch (default route). Switch
+    wired/wifi -> restart Conky to re-detect (Super+Shift+r restarts XMonad).
+  * Wireless SIGNAL line shows only when the active iface is wireless.
+  * CPU temp reads /sys/class/thermal/thermal_zone0/temp (no lm_sensors).
+    If zone0 isn't your CPU, change "thermal_zone0" below.
+  * ZRAM stats read /sys/block/zram0/{mm_stat,disksize} directly (works
+    whether or not zram0 is swapon'd). Shows orig stored / disksize.
+    If your conky dislikes ${execibar ...}, replace the bar line with a
+    plain percent via ${execi 5 ...}.
 ]]
+
+-- Auto-detect the active network interface (default route) ---------------
+local function detect_iface()
+	local h = io.popen("ip route 2>/dev/null | awk '/^default/ {print $5; exit}'")
+	if not h then return "lo" end
+	local i = h:read("*l")
+	h:close()
+	if i == nil or i == "" then return "lo" end
+	return i
+end
+
+local function is_wireless(iface)
+	local f = io.open("/sys/class/net/" .. iface .. "/wireless")
+	if f then f:close(); return true end
+	f = io.open("/sys/class/net/" .. iface .. "/phy80211")
+	if f then f:close(); return true end
+	return false
+end
+
+local IFACE = detect_iface()
+local WIFI  = ""
+if is_wireless(IFACE) then
+	WIFI = "${goto 12}${color3}SIGNAL${alignr}${color}${wireless_link_qual_perc "
+		.. IFACE .. "}%\n"
+end
 
 conky.config = {
 
@@ -57,7 +93,7 @@ conky.config = {
 	font  = 'Source Code Pro:bold:size=10',  	-- the default font used
 	font2 = 'Raleway:bold:size=30',         	-- font for the time
 	font3 = 'Ubuntu:size=14',               	-- font for the date
-	font4 = 'Raleway:bold:size=9',              -- font for the keybindings heading
+	font4 = 'Raleway:bold:size=9',              -- font for the section headers
 	max_text_width = 0,							-- 0 will make sure line does not get broken if width too smal
 	max_user_text = 16384,						-- max text in conky default 16384
 	override_utf8_locale = true,				-- force UTF8 requires xft
@@ -81,10 +117,10 @@ conky.config = {
 	own_window_hints = 'undecorated,below,above,sticky,skip_taskbar,skip_pager',  -- if own_window true - just hints - own_window_type sets it
 
 	--Colors (Doom One)
-	color0 = '#c678dd',
-	color1 = '#bbc2cf',
-	color2 = '#51afef',
-	color3 = '#98be65',
+	color0 = '#c678dd',		-- magenta : clock / date
+	color1 = '#bbc2cf',		-- fg      : process names, headers, rules
+	color2 = '#51afef',		-- blue    : bars & graphs
+	color3 = '#98be65',		-- green   : section/field labels
 };
 
 conky.text = [[
@@ -95,6 +131,8 @@ ${color2}${goto 12}${cpubar 8,254}
 ${voffset 5}${goto 12}$font${color1}${top name 1}$alignr$color${top cpu 1}%
 ${goto 12}${color1}${top name 2}$alignr$color${top cpu 2}%
 ${goto 12}${color1}${top name 3}$alignr$color${top cpu 3}%
+${goto 12}${color1}${top name 4}$alignr$color${top cpu 4}%
+${goto 12}${color1}${top name 5}$alignr$color${top cpu 5}%
 ${voffset 14}${goto 12}${color3}RAM${goto 50}$mem/$memmax
 ${color2}${goto 12}${membar 8,254}${color}
 ${goto 12}${voffset 5}${color1}${top_mem name 1}$alignr$color${top_mem mem_res 1}
@@ -102,33 +140,32 @@ ${goto 12}${color1}${top_mem name 2}$alignr$color${top_mem mem_res 2}
 ${goto 12}${color1}${top_mem name 3}$alignr$color${top_mem mem_res 3}
 ${goto 12}${color1}${top_mem name 4}$alignr$color${top_mem mem_res 4}
 ${goto 12}${color1}${top_mem name 5}$alignr$color${top_mem mem_res 5}
-${voffset 18}${color1}${alignc}${font4}XMONAD KEYBINDINGS${font}${color}
+${goto 12}${color1}${top_mem name 6}$alignr$color${top_mem mem_res 6}
+${voffset 16}${color1}${alignc}${font4}NETWORK${font}${color}
 ${color1}${hr}${color}
-${color1}[S]+[RET]${alignr}${color2}terminal${color}
-${color1}[S]+b${alignr}${color2}zen-browser${color}
-${color1}[S]+[SHIFT]+[RET]${alignr}${color2}dmenu${color}
-${color1}[S]+[SHIFT]+c${alignr}${color2}close window${color}
-${color1}[S]+j/k${alignr}${color2}move win focus${color}
-${color1}[S]+[SHIFT]+hjkl${alignr}${color2}move window${color}
-${color1}[S]+[1-9]${alignr}${color2}switch workspace${color}
-${color1}[S]+[SHIFT]+[1-9]${alignr}${color2}send window${color}
-${color1}[S]+h/l${alignr}${color2}shrink/expand${color}
+${if_up __IFACE__}${goto 12}${color3}IFACE${alignr}${color}__IFACE__
+__WIFI__${goto 12}${color3}LOCAL IP${alignr}${color}${addr __IFACE__}
+${voffset 4}${goto 12}${color3}DOWN${alignr}${color}${downspeed __IFACE__}
+${color2}${goto 12}${downspeedgraph __IFACE__ 36,254}${color}
+${goto 12}${color3}UP${alignr}${color}${upspeed __IFACE__}
+${color2}${goto 12}${upspeedgraph __IFACE__ 36,254}${color}
+${voffset 2}${goto 12}${color3}TOTAL${alignr}${color}${totaldown __IFACE__} / ${totalup __IFACE__}${else}${voffset 6}${alignc}${color1}~ no carrier ~${color}${endif}
+${voffset 16}${color1}${alignc}${font4}SYSTEM CORE${font}${color}
 ${color1}${hr}${color}
-${color1}[S]+e, e${alignr}${color2}launch emacs${color}
-${color1}[S]+e, b${alignr}${color2}ibuffer${color}
-${color1}[S]+e, d${alignr}${color2}dired${color}
-${color1}[S]+e, n${alignr}${color2}elfeed${color}
-${color1}[S]+e, s${alignr}${color2}eshell${color}
-${color1}[S]+e, v${alignr}${color2}vterm${color}
-${color1}${hr}${color}
-${color1}[S]+p, h${alignr}${color2}dm-hub${color}
-${color1}[S]+p, b${alignr}${color2}dm-setbg${color}
-${color1}[S]+p, e${alignr}${color2}dm-confedit${color}
-${color1}[S]+p, m${alignr}${color2}dm-man${color}
-${color1}[S]+p, o${alignr}${color2}dm-bookman${color}
-${color1}[S]+p, s${alignr}${color2}dm-websearch${color}
-${color1}${hr}${color}
-${color1}[S]+[SHIFT]+r${alignr}${color2}restart xmonad${color}
-${color1}[S]+[SHIFT]+q${alignr}${color2}quit xmonad${color}
+${goto 12}${color3}TEMP${alignr}${color}${execi 5 awk '{printf "%.0f", $1/1000}' /sys/class/thermal/thermal_zone0/temp 2>/dev/null}°C
+${goto 12}${color3}CLOCK${alignr}${color}${freq_g} GHz
+${goto 12}${color3}LOAD${alignr}${color}${loadavg 1}
+${goto 12}${color3}UPTIME${alignr}${color}${uptime_short}
+${voffset 5}${goto 12}${color3}ZRAM${alignr}${color}${execi 5 awk 'function h(b){s[0]="B";s[1]="K";s[2]="M";s[3]="G";s[4]="T";i=0;while(b>=1024&&i<4){b/=1024;i++}return sprintf("%.1f%s",b,s[i])} BEGIN{if((getline o < "/sys/block/zram0/mm_stat")<=0){print "n/a";exit} split(o,a," "); getline d < "/sys/block/zram0/disksize"; printf "%s / %s", h(a[1]), h(d)}'}
+${color2}${goto 12}${execibar 6,254 5 awk 'BEGIN{if((getline o < "/sys/block/zram0/mm_stat")<=0){print 0;exit} split(o,a," "); getline d < "/sys/block/zram0/disksize"; if(d>0) printf "%d", a[1]/d*100; else print 0}'}${color}
+${voffset 6}${goto 12}${color3}ROOT /${alignr}${color}${fs_used /} / ${fs_size /}
+${color2}${goto 12}${fs_bar 8,254 /}${color}
+${voffset 6}${goto 12}${color3}DISK I/O${alignr}${color}${diskio}
+${color2}${goto 12}${diskiograph 30,254}${color}
+${voffset 10}${color1}${hr}${color}
+${goto 12}${color1}${scroll 28 3 ${nodename}   ${kernel}   ${machine}   procs ${processes}   run ${running_processes}        }${color}
 ]];
 
+-- Inject detected interface + wifi line (function repl avoids % issues) ---
+conky.text = conky.text:gsub("__WIFI__",  function() return WIFI  end)
+conky.text = conky.text:gsub("__IFACE__", function() return IFACE end)
