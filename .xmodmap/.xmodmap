@@ -33,8 +33,8 @@ keycode 21 = equal plus EuroSign
 keycode 23 = Tab Return Return
 ! ê
 keycode 26 = e E ecircumflex
-! ~
-keycode 28 = t T asciitilde
+! ™
+keycode 28 = t T U2122
 ! û
 keycode 30 = u U ucircumflex
 ! î
