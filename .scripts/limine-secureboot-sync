@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+# serialize: pacman hook and the inotify watcher must not run at once
+exec 9>/run/limine-secureboot-sync.lock
+flock 9
+
+CONF=/boot/limine.conf
+[ -f "$CONF" ] || { echo "limine-secureboot-sync: $CONF missing, skipping" >&2; exit 0; }
+
+# pristine, package-managed binary — avoids sbctl 'incorrect digest' on re-sign
+CLEAN=/usr/share/limine/BOOTX64.EFI
+TMP=""
+if [ ! -f "$CLEAN" ]; then
+    PKG=$(ls -t /var/cache/pacman/pkg/limine-*-x86_64.pkg.tar.zst 2>/dev/null | head -1)
+    [ -n "$PKG" ] || { echo "limine-secureboot-sync: no clean binary available" >&2; exit 1; }
+    TMP=$(mktemp); CLEAN="$TMP"
+    bsdtar -xOf "$PKG" usr/share/limine/BOOTX64.EFI > "$CLEAN"
+fi
+
+CK=$(b2sum "$CONF" | awk '{print $1}')
+for efi in /boot/EFI/limine/limine_x64.efi /boot/EFI/limine/BOOTX64.EFI /boot/EFI/BOOT/BOOTX64.EFI; do
+    [ -d "$(dirname "$efi")" ] || continue
+    cp -f "$CLEAN" "$efi"
+    sbctl remove-file "$efi" 2>/dev/null || true
+    limine enroll-config "$efi" "$CK"
+    sbctl sign -s "$efi" >/dev/null
+done
+
+[ -n "$TMP" ] && rm -f "$TMP"
+echo "limine-secureboot-sync: enrolled $CK and signed all binaries"

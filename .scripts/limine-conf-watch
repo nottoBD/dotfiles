@@ -1,0 +1,23 @@
+#!/bin/sh
+# Re-sync Secure Boot artifacts whenever /boot/limine.conf content changes.
+CONF=/boot/limine.conf
+LOG=/var/log/limine-conf-watch.log
+log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+
+while [ ! -f "$CONF" ]; do sleep 2; done
+last=$(b2sum "$CONF" | awk '{print $1}')
+log "watcher started, baseline $last"
+
+while true; do
+    sleep 3
+    [ -f "$CONF" ] || continue
+    cur=$(b2sum "$CONF" | awk '{print $1}')
+    [ "$cur" = "$last" ] && continue
+    log "config changed $last -> $cur, re-syncing"
+    if /usr/local/bin/limine-secureboot-sync >> "$LOG" 2>&1; then
+        log "re-sync OK"
+    else
+        log "RE-SYNC FAILED — DO NOT REBOOT until fixed"
+    fi
+    last=$(b2sum "$CONF" | awk '{print $1}')
+done

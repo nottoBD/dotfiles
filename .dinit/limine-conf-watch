@@ -1,0 +1,5 @@
+type = process
+command = /usr/local/bin/limine-conf-watch
+restart = yes
+smooth-recovery = yes
+logfile = /var/log/limine-conf-watch.log
