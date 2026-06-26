@@ -7,6 +7,7 @@ alias .xev 'xev | grep keycode'
 alias .xprop 'xprop | grep WM_CLASS'
 alias .ip 'curl -4 ifconfig.me'
 alias .sshP "eval (ssh-agent -c); and set -x GPG_TTY (tty); and ssh-add ~/.ssh/id_ed25519_github"
+alias .school "cd /home/devid/.local/share/Cryptomator/mnt/school"
 
 
 # wrappers
