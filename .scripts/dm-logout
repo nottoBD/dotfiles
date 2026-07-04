@@ -89,7 +89,7 @@ main() {
 		;;
 	'Suspend')
 		if [[ "$(echo -e "No\nYes" | ${MENU} "${choice}?")" == "Yes" ]]; then
-			suspend
+			loginctl suspend
 		else
 			output "User chose not to suspend." && exit 0
 		fi
