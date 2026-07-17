@@ -25,7 +25,7 @@ unalias ls 2>/dev/null
 function ls() {
     local target="${1:-.}"
     if [ -d "$target" ]; then
-        exa -al --color=always --group-directories-first --icons "$target"
+        exa -al --color=always --group-directories-first 
     else
         command ls "$@"
     fi

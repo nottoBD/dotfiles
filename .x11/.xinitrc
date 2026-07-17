@@ -1,1 +1,50 @@
-/home/devid/.xinitrc
+#!/bin/sh
+
+[ -f ~/.xprofile ] && . ~/.xprofile
+
+sysresources="/home/devid/.Xresources"
+sysmodmap="/home/devid/.xmodmap"
+
+[ -f "$sysresources" ] && xrdb -merge "$sysresources"
+[ -f "$sysmodmap" ] && xmodmap "$sysmodmap"
+
+if [ -d /etc/X11/xinit/xinitrc.d ]; then
+    for f in /etc/X11/xinit/xinitrc.d/?*.sh; do
+        [ -x "$f" ] && . "$f"
+    done
+    unset f
+fi
+
+xset b off
+xset s off -dpms
+xset s noblank
+xset r rate 280 80
+xss-lock -- xtrlock &
+# ( pactl set-sink-mute @DEFAULT_SINK@ 1 || true ) &
+# ( pactl list short sources | grep -vi "monitor" | awk '{print $1}' \
+#     | xargs -r -I{} sh -c 'pactl set-source-mute {} 1; pactl set-source-volume {} 0%' || true ) &
+
+brightnessctl -q set 20%
+
+pgrep -x unclutter >/dev/null || unclutter -idle 1 &
+
+pgrep -x xidlehook  >/dev/null || xidlehook --not-when-audio \
+  --timer 9500 'loginctl suspend' '' &
+#  --timer 2500 'xtrlock' '' \
+
+# TP_ID="$(xinput list | awk -F'id=' '/[Tt]ouchpad/{print $2}' | awk '{print $1; exit}')"
+# [ -n "$TP_ID" ] && xinput disable "$TP_ID"
+
+
+
+if xrandr --query | grep -q "HDMI-1 connected"; then
+    xrand9
+else
+    xranddef
+fi
+eval "$(gnome-keyring-daemon --start --components=secrets)"
+export GNOME_KEYRING_CONTROL
+dbus-update-activation-environment --all
+
+exec xmonad
+

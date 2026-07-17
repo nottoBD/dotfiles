@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+qemu-img create -f qcow2 ubuntu12.img 20G
+
+qemu-system-i386 \
+  -m 2G \
+  -cpu qemu32,+nx \
+  -vga std \
+  -boot d \
+  -cdrom ~/vm/ubuntu-12.04.3-desktop-i386.iso \
+  -hda ./ubuntu12.img \
+  -net nic,model=e1000 -net user \
+  -rtc base=localtime \
+  -usb -device usb-tablet

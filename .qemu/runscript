@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# ~/vm/ubuntu12/runscript — boots installed system
+qemu-system-i386 \
+  -m 4G -cpu qemu32,+nx -vga std \
+  -boot menu=on \
+  -hda ~/vm/ubuntu-12-i386/ubuntu12.img \
+  -net nic,model=e1000 -net user,hostfwd=tcp::2222-:22 \
+  -rtc base=localtime \
+  -usb -device usb-tablet
+
+
+sleep 20
+
+alacritty -e sh -c 'ssh -p 2222 david@127.0.0.1'

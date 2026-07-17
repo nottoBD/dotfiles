@@ -74,7 +74,7 @@ import XMonad.Util.SpawnOnce
 import XMonad.Util.Cursor
 
 -- Battery periodic check (TEST)
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (forkIO)
 --import Control.Monad (forever, when, void)
 -- Right handed master pane test
 import XMonad.Layout.Reflect
@@ -112,7 +112,7 @@ myTerminal :: String
 myTerminal = "alacritty"
 
 myBrowser :: String
-myBrowser = "zen-browser"
+myBrowser = "zen"
 
 myEditor :: String
 myEditor = myTerminal ++ " -e vim "
@@ -142,10 +142,10 @@ myStartupHook = do
     safeSpawn "killall" ["volctl"]
     safeSpawn "killall" ["xsettingsd"]
 
-    liftIO $ threadDelay (2 * 1000000)
 
     safeSpawn "trayer" ["--edge", "top", "--align", "right", "--widthtype", "request", "--padding", "4", "--SetDockType", "true", "--SetPartialStrut", "false", "--expand", "true", "--transparent", "true", "--alpha", "0", "--tint", "0x282c34", "--height", "22", "--monitor", "primary"]
     safeSpawn "dunst" []
+    safeSpawn "batsignal" ["-w", "30", "-c", "20", "-d", "10", "-f", "89"]
     safeSpawn "conky" ["-c", "/home/devid/.config/conky/doom-one-01.conkyrc"]
     safeSpawn "picom" []
     safeSpawn "volctl" []
@@ -164,9 +164,10 @@ myStartupHook = do
     spawnOnOnce (myWorkspaces !! 2) "zen"  -- Zen → workspace 3
     spawnOnOnce (myWorkspaces !! 3) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
     spawnOnOnce (myWorkspaces !! 7) "freetube"                 -- FreeTube → workspace 8
+    
+    
+    spawnOnOnce (myWorkspaces !! 6) "org.cryptomator.launcher.Cryptomator$MainApp"                 -- Cryptomator → workspace 7
     spawnOnce "sleep 2 && until xdotool search --onlyvisible --class zen-browser windowactivate --sync key --clearmodifiers shift+alt+u 2>/dev/null; do sleep 0.8; done"
-    spawnOnce "$HOME/.local/bin/x-settings && xset s off -dpms"
-    spawnOnce "numlockx"
     
 
 
@@ -427,7 +428,9 @@ myLayoutHook = avoidStruts
 myWorkspaces = [" 1 ", " 2 ", " 3 ", " 4 ", " 5 ", " 6 ", " 7 ", " 8 ", " 9 "]
 myWorkspaceIndices = M.fromList $ zipWith (,) myWorkspaces [1..]
 
-clickable ws = "<action=xdotool key super+"++show i++">"++ws++"</action>"
+-- clickable ws = "<action=xdotool key super+"++show i++">"++ws++"</action>"
+--     where i = fromJust $ M.lookup ws myWorkspaceIndices
+clickable ws = "<action=xdotool key --clearmodifiers super+" ++ show i ++ ">" ++ ws ++ "</action>"
     where i = fromJust $ M.lookup ws myWorkspaceIndices
 
 
@@ -451,7 +454,6 @@ myManageHook = composeAll
   , className =? "toolbar"            --> doFloat
   , className =? "python3"            --> doFloat
   , className =? "cs2"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
-  , className =? "steam_app_2668510"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
   , className =? "pavucontrol"        --> doCenterFloat
   , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.798 0.25 0.2 0.45)
   , className =? "Yad"                --> doCenterFloat 
@@ -469,13 +471,14 @@ myManageHook = composeAll
   , className =? "Emacs"             --> doShift ( myWorkspaces !! 0 )
   , className =? "Audacious"             --> doShift ( myWorkspaces !! 7 )
   , className =? "steam"             --> doShift ( myWorkspaces !! 1 )
-  , className =? "Steam"             --> doShift ( myWorkspaces !! 1 )
   , className =? "FreeTube" --> doShift  ( myWorkspaces !! 7 )
   , className =? "vmware" --> doShift  ( myWorkspaces !! 4 )
   , className =? "corectrl" --> doShift  ( myWorkspaces !! 8 )
   , className =? "Piper" --> doShift  ( myWorkspaces !! 8 )
   , className =? "tuxedo-control-center" --> doShift  ( myWorkspaces !! 8 )
   , (className =? "firefox" <&&> resource =? "Dialog") --> doFloat
+  
+  , className =? "org.cryptomator.launcher.Cryptomator$MainApp" --> doShift  ( myWorkspaces !! 6 )
 
   , isFullscreen -->  doFullFloat
   ] <+> namedScratchpadManageHook myScratchPads
@@ -607,10 +610,10 @@ myKeys c =
   ^++^ subKeys "Favorite programs"
   [ ("M-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
   , ("M-alt-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
-  , ("M-b", addName "Launch web browser"       $ spawn "zen-browser --new-window https://web.tabliss.io/")
+  , ("M-b", addName "Launch web browser"       $ spawn "zen --new-window https://web.tabliss.io/")
   , ("M-S-l", addName "Bitwarden"  $ spawn  "dbus-run-session -- flatpak run com.bitwarden.desktop &")
   --, ("M-d", addName "Launch Doom Emacs"        $ spawn "emacsclient -c -a '' --eval '(progn (+doom-dashboard/open (selected-frame)))'")
-  , ("M-d", addName "Launch Doom Emacs"        $ spawn "doom run")
+  , ("M-d", addName "Launch Doom Emacs"        $ spawn "emacs")
   , ("M-M1-h", addName "Launch htop"           $ spawn (myTerminal ++ " -e htop"))
   , ("<Print>", addName "Selection screenshot" $ spawn "maim -s | xclip -selection clipboard -t image/png")
   , ("M-C-v", addName "Primary paste"          $ spawn "xdotool click 1")
@@ -679,31 +682,28 @@ myKeys c =
   , ("C-M-7", addName "Menu of system apps"     $ spawnSelected' gsSystem)
   , ("C-M-8", addName "Menu of utilities apps"  $ spawnSelected' gsUtilities)]
 
-  ^++^ subKeys "Volume control with Function keys"
-  [ ("<F6>", addName "Toggle audio mute (all sinks)" $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-mute {} toggle")
-  , ("<F7>", addName "Lower volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} -5%")
-  , ("<F8>", addName "Raise volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} +5%")
-  ]
-  -- Multimedia Keys
   ^++^ subKeys "Multimedia keys"
   [ ("<XF86AudioPlay>", addName "mocp play"           $ spawn "mocp --play")
   , ("<XF86AudioPrev>", addName "mocp next"           $ spawn "mocp --previous")
   , ("<XF86AudioNext>", addName "mocp prev"           $ spawn "mocp --next")
   , ("<XF86AudioMute>", addName "Toggle audio mute"   $ spawn "dinitctl start --pin pipewire && dinitctl start --pin pipewire-pulse && dinitctl start --pin wireplumber && amixer set Master toggle")
-  , ("<F6>", addName "Toggle audio mute"   $ spawn "dinitctl start --pin pipewire && dinitctl start --pin pipewire-pulse && dinitctl start --pin wireplumber && amixer set Master toggle")
   , ("<XF86AudioLowerVolume>", addName "Lower vol" $ spawn "pactl set-sink-volume @DEFAULT_SINK@ -5%")
   , ("<XF86AudioRaiseVolume>", addName "Raise vol" $ spawn "pactl set-sink-volume @DEFAULT_SINK@ +5%")
   , ("<XF86MonBrightnessDown>", addName "Decrease brightness" $ spawn "~/.local/bin/brightdown")
   , ("<XF86MonBrightnessUp>",   addName "Increase brightness" $ spawn "~/.local/bin/brightup")
-  , ("<F1>", addName "Decrease brightness" $ spawn "~/.local/bin/brightdown")
-  , ("<F2>",   addName "Increase brightness" $ spawn "~/.local/bin/brightup")
   , ("<XF86HomePage>", addName "Open home page"       $ spawn (myBrowser ++ " https://web.tabliss.io"))
   , ("<XF86Search>", addName "Web search (dmscripts)" $ spawn "dm-websearch")
   , ("<XF86Mail>", addName "Email client"             $ runOrRaise "thunderbird" (resource =? "thunderbird"))
   , ("<XF86Calculator>", addName "Calculator"         $ runOrRaise "qalculate-gtk" (resource =? "qalculate-gtk"))
   , ("<XF86Eject>", addName "Eject /dev/cdrom"        $ spawn "eject /dev/cdrom")
   , ("<XF86TouchpadToggle>", addName "Toggle Touchpad"        $ spawn "$HOME/.local/bin/toggle-touchpad && $HOME/.local/bin/x-settings")
-
+  , ("<F1>", addName "Decrease brightness" $ spawn "~/.local/bin/brightdown")
+  , ("<F2>",   addName "Increase brightness" $ spawn "~/.local/bin/brightup")
+  , ("<F6>", addName "Toggle audio mute (all sinks)" $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-mute {} toggle")
+  --, ("<F6>", addName "Toggle audio mute"   $ spawn "dinitctl start --pin pipewire && dinitctl start --pin pipewire-pulse && dinitctl start --pin wireplumber && amixer set Master toggle")
+  , ("<F7>", addName "Lower volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} -5%")
+  , ("<F8>", addName "Raise volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} +5%")
+  , ("<F11>", addName "Toggle touchpad"            $ spawn "$HOME/.local/bin/toggle-touchpad && $HOME/.local/bin/x-settings")
   ]
   -- The following lines are needed for named scratchpads.
     where nonNSP          = WSIs (return (\ws -> W.tag ws /= "NSP"))
@@ -727,7 +727,7 @@ main = do
 --  xmproc2 <- spawnPipe ("xmobar -x 2 $HOME/.config/xmobar/" ++ colorScheme ++ "-xmobarrc")
   -- the xmonad, ya know...what the WM is named after!
   xmonad $ addDescrKeys' ((mod4Mask, xK_F1), showKeybindings) myKeys $ ewmh $ docks $ def
-    { manageHook         = myManageHook <+> myManageHook <+> manageDocks
+    { manageHook         = manageSpawn <+> myManageHook <+> manageDocks
     , handleEventHook    = windowedFullscreenFixEventHook <> swallowEventHook (className =? "Alacritty"  <||> className =? "st-256color" <||> className =? "XTerm") (return True) <> trayerPaddingXmobarEventHook
     , modMask            = myModMask
     , terminal           = myTerminal
