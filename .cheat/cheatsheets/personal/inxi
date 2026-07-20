@@ -1,0 +1,2 @@
+# Full system description
+sudo inxi -Fxxxrza

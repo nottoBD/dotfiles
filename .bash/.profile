@@ -1,6 +1,12 @@
 # POSIX compliant
 
 # ---------------------------------------------------------------------------
+# Cryptomator vaults
+# ---------------------------------------------------------------------------
+export docs="$HOME/.local/share/Cryptomator/mnt/documents"
+export school="$HOME/.local/share/Cryptomator/mnt/school"
+
+# ---------------------------------------------------------------------------
 # XDG base directories
 # ---------------------------------------------------------------------------
 export XDG_CONFIG_HOME="$HOME/.config"

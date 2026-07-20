@@ -1,0 +1,12 @@
+ Two real content changes, two automatic re-syncs, both within ~10 seconds, zero intervention. sbctl verify is clean. The automation is genuinely live.
+
+There's one important consequence of that last edit you should register: your config's current hash is now 6b3498e8…, not the cd03469f… you started the session with. That's correct and fine — the binaries are enrolled to match 6b3498e8…, so you'll boot clean. The point is the "known good hash" is no longer a fixed number you memorize; it's whatever the watcher last enrolled. Don't compare against old values from earlier in this thread. The only check that matters going forward is the relationship: does the config on disk match what's enrolled — and the watcher now maintains that for you.
+
+
+The three things automation can't cover, so know them:
+
+    A firmware update may reset Secure Boot or wipe enrolled keys. Not a brick — it boots, since enforcement drops. Fix: re-run sbctl enroll-keys --yes-this-might-brick-my-machine, re-enable SB. Glance at sbctl status after any BIOS/fwupd update.
+    The supervisor password is what makes all of this meaningful against an evil maid — without it, someone re-enters Setup Mode and enrolls their own PK. Confirm it's set.
+    Your recovery valve, proven twice: firmware → disable Secure Boot → boot, or live USB → mount ESP → limine enroll-config against the current config on all three binaries. Keep that USB around.
+
+

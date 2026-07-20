@@ -1,0 +1,19 @@
+# Script for detecting unused firmwares
+```
+for m in $(lsmod | awk 'NR>1{print $1}'); do
+  modinfo -F firmware "$m" 2>/dev/null
+done | sort -u > /tmp/fw_ref
+
+for pkg in mediatek radeon realtek other; do
+  p=linux-firmware-$pkg
+  pacman -Qq "$p" &>/dev/null || continue
+  match=$(pacman -Qlq "$p" | grep -F /usr/lib/firmware/ \
+            | sed -e 's#.*/usr/lib/firmware/##' -e 's/\.\(zst\|xz\|gz\)$//' \
+            | sort -u | comm -12 - /tmp/fw_ref)
+  if [ -n "$match" ]; then
+    printf '== %s: genuinely referenced ==\n%s\n' "$p" "$match"
+  else
+    echo "$p: nothing referenced → removal candidate"
+  fi
+done
+```

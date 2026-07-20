@@ -1,0 +1,2 @@
+# Make package explicit (cannot orphan)
+sudo pacman -D --asexplicit linux-firmware-{amdgpu,intel,other,whence}
