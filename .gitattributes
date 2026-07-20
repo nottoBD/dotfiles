@@ -14,3 +14,5 @@
 # .pem
 *.pem filter=git-crypt diff=git-crypt
 .scripts/green-comm filter=git-crypt diff=git-crypt
+# Others
+.gitconfig filter=git-crypt diff=git-crypt
