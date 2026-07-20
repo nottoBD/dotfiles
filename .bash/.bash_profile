@@ -1,3 +1,5 @@
+[ -f ~/.profile ] && . ~/.profile
+
 if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
     xmonad --recompile && exec startx
 fi
@@ -12,7 +14,3 @@ fi
 eval "$(zoxide init bash)"
 set -o vi
 
-
-
-
-export PATH=$PATH:/home/devid/.spicetify
