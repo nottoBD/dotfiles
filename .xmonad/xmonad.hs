@@ -164,9 +164,8 @@ myStartupHook = do
     spawnOnOnce (myWorkspaces !! 2) "zen"  -- Zen → workspace 3
     spawnOnOnce (myWorkspaces !! 3) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
     spawnOnOnce (myWorkspaces !! 7) "freetube"                 -- FreeTube → workspace 8
-    
-    
     spawnOnOnce (myWorkspaces !! 6) "cryptomator"                 -- Cryptomator → workspace 7
+    
     spawnOnce "sleep 2 && until xdotool search --onlyvisible --class zen-browser windowactivate --sync key --clearmodifiers shift+alt+u 2>/dev/null; do sleep 0.8; done"
     
 
