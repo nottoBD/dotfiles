@@ -9,3 +9,6 @@ sudo find / -type f -size -1M -exec grep -sIl -- "QT_STYLE_OVERRIDE" {} + 2>/dev
 
 # Remove all Python files recursively
 find -name '*.py' -delete
+
+# Add files >99MB to gitignore
+find . -size +99M -type f | sed 's|^\./||' >> .gitignore && sort -u .gitignore -o .gitignore

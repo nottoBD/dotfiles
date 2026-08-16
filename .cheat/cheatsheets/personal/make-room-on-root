@@ -1,0 +1,15 @@
+# 1. Aggressive pacman cache clean — keep only 1 version of installed packages
+sudo paccache -rk1
+
+# 2. Remove ALL cached versions of uninstalled packages (if step 1 wasn't enough)
+sudo paccache -ruk0
+
+# 3. Check/clean systemd journal logs (these can balloon to gigabytes)
+sudo journalctl --vacuum-time=2weeks
+# or hard-cap it: sudo journalctl --vacuum-size=100M
+
+# 4. Remove orphaned packages
+sudo pacman -Rns $(pacman -Qdtq) 2>/dev/null || echo "No orphans found"
+
+# 5. If still desperate — remove the entire pkg cache (re-downloads on next update)
+sudo pacman -Sc
