@@ -43,7 +43,7 @@ Config { font            = "Monocraft Semibold 11"
                           "-i", "",           -- charged
                           "-o", "",           -- unplugged
                           "-L", "20",         -- low bat
-                          "-H", "80",         -- high bat
+                          "-H", "90",         -- high bat
                           "-l", "red",        -- low bat
                           "-m", "blue",       -- med bat
                           "-h", "green"
