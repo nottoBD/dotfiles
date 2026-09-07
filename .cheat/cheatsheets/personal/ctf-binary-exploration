@@ -1,0 +1,7 @@
+# see if there's any logic at all
+objdump -d ./binary                    
+# dump printable strings with file offsets
+strings -a -t x ./binary                
+
+
+

@@ -1,0 +1,21 @@
+# Hex → ASCII
+printf '%b' '\x70\x61\x73\x73\n'          # multiple bytes at once
+echo -n '70617373' | xxd -r -p             # from a hex string (e.g. a flag chunk)
+
+# ASCII → Hex
+printf '%s' 'pass' | xxd -p
+
+# Decimal ↔ Hex (no shell arithmetic needed)
+printf '%x\n' 112      # -> 70
+printf '%d\n' 0x70     # -> 112   (printf itself parses the 0x prefix)
+
+# Base64
+echo -n 'pass' | base64
+echo 'cGFzcw==' | base64 -d
+
+# Binary 
+python3 -c "print(bin(42))"
+perl -e 'printf "%b\n", 42'
+
+# column of integers -> Char
+awk '{printf "%c", $1}' bytes.txt
