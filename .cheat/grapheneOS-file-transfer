@@ -1,0 +1,13 @@
+# phone: switch to target profile, unlock, USB -> File transfer, keep unlocked
+
+# check phone is visible
+lsusb | grep 18d1
+
+# mount
+mkdir -p ~/phone && aft-mtp-mount ~/phone
+
+# copy (resumable, rerun if it drops)
+rsync -rv --size-only --inplace --progress ~/SRC/ ~/phone/'Internal shared storage'/Download/DEST/
+
+# unmount (only after rsync finishes)
+fusermount3 -u ~/phone
