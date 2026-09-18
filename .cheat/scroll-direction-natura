@@ -1,0 +1,3 @@
+xinput list | grep -i logi
+
+xinput set-prop <id> "libinput Natural Scrolling Enabled" 1   # 0 to revert
