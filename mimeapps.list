@@ -1,0 +1,31 @@
+[Default Applications]
+x-scheme-handler/http=zen.desktop
+x-scheme-handler/https=zen.desktop
+x-scheme-handler/chrome=zen.desktop
+text/html=zen.desktop
+application/x-extension-htm=zen.desktop
+application/x-extension-html=zen.desktop
+application/x-extension-shtml=zen.desktop
+application/xhtml+xml=zen.desktop
+application/x-extension-xhtml=zen.desktop
+application/x-extension-xht=zen.desktop
+video/mp4=mpv.desktop
+application/x-zerosize=vim.desktop
+application/pdf=org.pwmt.zathura-pdf-mupdf.desktop
+x-scheme-handler/freetube=freetube.desktop
+inode/directory=pcmanfm.desktop
+
+[Added Associations]
+x-scheme-handler/http=zen.desktop;zen-browser.desktop;
+x-scheme-handler/https=zen.desktop;zen-browser.desktop;
+x-scheme-handler/chrome=zen.desktop;zen-browser.desktop;
+text/html=nvim.desktop;zen-browser.desktop;zen.desktop;
+application/x-extension-htm=zen-browser.desktop;zen.desktop;
+application/x-extension-html=zen-browser.desktop;zen.desktop;
+application/x-extension-shtml=zen-browser.desktop;zen.desktop;
+application/xhtml+xml=zen-browser.desktop;zen.desktop;
+application/x-extension-xhtml=zen-browser.desktop;zen.desktop;
+application/x-extension-xht=zen-browser.desktop;zen.desktop;
+video/mp4=mpv.desktop;
+application/x-zerosize=nvim.desktop;vim.desktop;
+application/pdf=zen-browser.desktop;org.pwmt.zathura-pdf-mupdf.desktop;brave-browser.desktop;

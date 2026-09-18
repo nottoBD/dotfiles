@@ -8,6 +8,7 @@
 .pacman/** filter=git-crypt diff=git-crypt
 .snapper/** filter=git-crypt diff=git-crypt
 .sudo/** filter=git-crypt diff=git-crypt
+.root/** filter=git-crypt diff=git-crypt
 .zen/** filter=git-crypt diff=git-crypt
 .dinit/** filter=git-crypt diff=git-crypt
 
@@ -16,3 +17,4 @@
 .scripts/green-comm filter=git-crypt diff=git-crypt
 # Others
 .gitconfig filter=git-crypt diff=git-crypt
+.gtk-3.0/bookmarks filter=git-crypt diff=git-crypt

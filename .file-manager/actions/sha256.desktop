@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Action
+Name=SHA-256
+Profiles=p;
+
+[X-Action-Profile p]
+MimeTypes=all/allfiles;
+Exec=alacritty --hold -e sha256sum %F
