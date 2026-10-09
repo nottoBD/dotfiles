@@ -1,0 +1,22 @@
+# disk images, firmware state, secrets: never versioned
+*.iso
+*.ova
+*.vmdk
+*.qcow2
+*.img
+*.raw
+*.fd
+*.E01
+*.Ex01
+*.elf
+*.lime
+*.vmem
+*.mem
+*.pcap
+*.zip
+tpm/
+tpm.baseline/
+*.sock
+*.log
+# filled-in answer file (template keeps 'changeme')
+autounattend.filled.xml
