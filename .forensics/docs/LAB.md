@@ -43,7 +43,7 @@ Why this shape:
 | Chapter (slides) | Tools / data | Runs on | Status |
 |---|---|---|---|
 | 00 Preamble | SIFT, Windows | both | ✅ |
-| 01 Disks | FTK Imager (USB key → E01), `ewfmount`, `mmls`, `fls`, `icat`, timeline; `usb-01…06` images | Windows (imaging) + SIFT (analysis) | Tools ✅ · USB passthrough ⏳ untested · data ⏳ |
+| 01 Disks | FTK Imager 8.3 (USB key → E01), `ewfmount`, `mmls`, `fls`, `icat`, timeline; `usb-01…06` images | Windows (imaging) + SIFT (analysis) | Tools ✅ · USB passthrough ⏳ untested · data ⏳ |
 | 02 Windows | RegRipper (`hives-01`), `evtxinfo/evtxexport` (`eventlogs-01`), Eric Zimmerman tools (`prefetch.zip`), Thumbcache Viewer | SIFT + Windows | RegRipper ✅ (no fix needed) · EZ ✅ · Thumbcache Viewer ⏳ · data ⏳ |
 | 03.1 Memory (Windows) | **Volatility 2** (`vol.py --profile=WinXPSP2x86`, `imageinfo`, `kdbgscan`), stuxnet/cridex/prolaco images; dumping a VM's memory | Vol2 VM (course OVA) | ⏳ SIFT has only Volatility 3 |
 | 03.2 Memory (Linux) | LiME (acquisition), Vol2 Linux profiles (`LinuxDebian5010x86`), victoria-v8 image | Vol2 VM | ⏳ |
@@ -78,6 +78,7 @@ Why this shape:
   - Plaintext answer-file copy `C:\Windows\Panther\unattend.xml` deleted.
   - VBS status 0.
   - .NET 9 Desktop Runtime (winget), Eric Zimmerman tools in `C:\Tools\EZ` (`Get-ZimmermanTools.ps1 -NetVersion 9`).
+  - FTK Imager 8.3 (exterro.com, free edition), installed manually.
   - OpenSSH Server (`Add-WindowsCapability`; slow/silent via Windows Update — script now tries winget first), DefaultShell = PowerShell, firewall rule via `netsh` (profile any — slirp NAT is classified Public).
 - **SSH key auth** (`dfir-lab.sh keys`): admin accounts read only `C:\ProgramData\ssh\administrators_authorized_keys`. It contained a stringified PowerShell object from an earlier one-liner and a mangled key line → sshd silently refused the key. Fixed: file rewritten as ASCII with key lines only, owner and ACL Administrators/SYSTEM only. Key: `~/.ssh/id_dfir_lab` (dedicated, loopback only).
 - **Baseline**: retaken 2026-10-10 10:24 — **before** the key fix → retake (§5.1).
@@ -158,10 +159,12 @@ pkill -x pcmanfm; pcmanfm -d &
 ```
 Verify: plug a test key → `findmnt | grep /run/media` must show nothing. For host-side imaging, also use a hardware write blocker or `blockdev --setro`.
 
-### 5.3 Windows tools still missing → re-baseline
-- **FTK Imager 8.3** (free, not "Pro"): exterro.com/ftk-downloads → in the guest (`start --net win`).
-- **Thumbcache Viewer**: thumbcacheviewer.github.io → `C:\Tools\`.
-- Then `dfir-lab.sh stop win && dfir-lab.sh baseline win`.
+### 5.3 Windows: Thumbcache Viewer (last missing tool) → re-baseline
+FTK Imager 8.3 is installed. Thumbcache Viewer 1.0.4.0 (thumbcacheviewer.github.io), guest must be in `--net` mode:
+```fish
+dfir-lab.sh ssh win '$ProgressPreference=0; Invoke-WebRequest https://github.com/thumbcacheviewer/thumbcacheviewer/releases/download/v1.0.4.0/thumbcache_viewer_64.zip -OutFile $env:TEMP\tcv.zip; Expand-Archive $env:TEMP\tcv.zip C:\Tools\ThumbcacheViewer -Force; Get-ChildItem C:\Tools\ThumbcacheViewer'
+dfir-lab.sh stop win && dfir-lab.sh baseline win
+```
 
 ### 5.4 Lab data
 ```fish
