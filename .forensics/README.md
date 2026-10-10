@@ -48,4 +48,8 @@ Revert SIFT: `qemu-img snapshot -a baseline ~/vm/images/sift/sift.qcow2`.
 - `Add-WindowsCapability OpenSSH.Server` can hang silently via Windows Update; setup.ps1 tries winget first.
 - `pidwait` exits 1 when nothing matches: don't chain `; and qemu-img snapshot`.
 - Memory slides use Volatility 2 (`vol.py --profile`); SIFT 2026 ships only Volatility 3 (`vol`). Use the course OVA `mint-19.3-volatility.ova`.
-- Host: `limine-conf-watch` (dinit) needs `depends-on = local.target`, else its logfile in `@var` doesn't exist yet at boot.
+- Host: `limine-conf-watch` failed at boot with ENOENT opening its logfile in `@var`; unit already had `depends-on = local.target`, root cause unconfirmed — check after reboots.
+- Windows sshd + PowerShell 5.1: remote powershell blocks on redirected stdin → `ssh -n` and `-InputFormat None`; quotes don't survive sshd → ship scripts as `-EncodedCommand`.
+- Admin users authenticate only via `C:\ProgramData\ssh\administrators_authorized_keys` (owner + ACL: Administrators/SYSTEM only, ASCII, key lines only). A stringified `$input` object and a mangled key line made sshd fail silently; `dfir-lab.sh keys` now rewrites it clean. Debug: `SyslogFacility LOCAL0` + `LogLevel DEBUG3` → `C:\ProgramData\ssh\logs\sshd.log`.
+
+Full build history and remaining work: [docs/LAB.md](docs/LAB.md).

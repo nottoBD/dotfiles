@@ -40,7 +40,7 @@ pat()     { printf -- '^qemu-system-x86_64 .*-name %s( |$)' "${NAME[$1]}"; }
 running() { pgrep -f -- "$(pat "$1")" >/dev/null; }
 mon()     { printf '%s\n' "$2" | socat - "UNIX-CONNECT:$IMG/${NAME[$1]}/mon.sock"; }
 banner()  { timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.1/$1 && head -c 4 <&3" 2>/dev/null | grep -q '^SSH-'; }
-ssh_opts() { printf '%s\n' -i "$KEY" -p "${PORT[$1]}" -o StrictHostKeyChecking=accept-new \
+ssh_opts() { printf '%s\n' -i "$KEY" -o IdentitiesOnly=yes -p "${PORT[$1]}" -o StrictHostKeyChecking=accept-new \
                -o UserKnownHostsFile="$KNOWN" -o LogLevel=ERROR; }
 sshb()    { local g=$1; shift; mapfile -t o < <(ssh_opts "$g")
             ssh -n "${o[@]}" -o BatchMode=yes -o ConnectTimeout=5 "${USERN[$g]}@127.0.0.1" "$@"; }
@@ -225,9 +225,27 @@ cmd_keys() {
   else warn "sift not reachable: skipped"; fi
   if banner 2222; then
     # quotes don't survive Windows sshd -> powershell -c; ship the script as -EncodedCommand
-    local ps='$f = "C:\ProgramData\ssh\administrators_authorized_keys"
-if (-not (Test-Path $f) -or -not (Select-String -Path $f -SimpleMatch "__PUB__" -Quiet)) { Add-Content -Path $f -Value "__PUB__" }
-icacls $f /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F" | Out-Null'
+    # sshd rejects administrators_authorized_keys unless owner + ACL are only Administrators/SYSTEM
+    local ps='$ProgressPreference = "SilentlyContinue"
+# rewrite as plain ASCII: a UTF-16/BOM file (e.g. made by Out-File or >) is unreadable to sshd
+function Add-Key($path) {
+  $lines = @()
+  # keep only real key lines: junk lines (e.g. a stringified PowerShell object) break ssh-keygen -l
+  if (Test-Path $path) { $lines = @(Get-Content $path | Where-Object { $_ -match "^(ssh-|ecdsa-|sk-)" }) }
+  if ($lines -notcontains "__PUB__") { $lines += "__PUB__" }
+  Set-Content -Path $path -Value $lines -Encoding ascii
+}
+$f = "C:\ProgramData\ssh\administrators_authorized_keys"
+Add-Key $f
+icacls $f /setowner "Administrators" | Out-Null
+icacls $f /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F" | Out-Null
+icacls $f
+"first bytes: " + ((Get-Content $f -Encoding Byte -TotalCount 4) -join " ")
+# per-user file too, used if sshd_config has no "Match Group administrators" block
+$u = Join-Path $env:USERPROFILE ".ssh\authorized_keys"
+New-Item -ItemType Directory -Force (Split-Path $u) | Out-Null
+Add-Key $u
+Select-String -Path "C:\ProgramData\ssh\sshd_config" -Pattern "^\s*Match Group administrators" | ForEach-Object { "sshd_config: " + $_.Line.Trim() }'
     # -n + -InputFormat None: Windows PowerShell 5.1 otherwise blocks reading the (redirected) stdin
     ssh -n -p 2222 -o UserKnownHostsFile="$KNOWN" -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR analyst@127.0.0.1 \
       "powershell -NoProfile -NonInteractive -InputFormat None -EncodedCommand $(psenc "${ps//__PUB__/$pub}")"
