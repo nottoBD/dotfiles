@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # dfir-lab.sh — lesson runner for the forensics lab
 #
-#   dfir-lab.sh start [--net] [--clean] [win] [sift] [vol2]   boot guests (default: both, isolated), checks, lesson notes
-#   dfir-lab.sh stop  [win] [sift] [vol2]                     ACPI shutdown, wait for exit
-#   dfir-lab.sh status
+#   dfir-lab.sh start [--net] [--clean] [win] [sift] [vol2]   boot guests (default: win + sift, isolated), checks, lesson notes
+#   dfir-lab.sh stop  [win] [sift] [vol2]          ACPI shutdown, wait for exit (default: every running guest)
+#   dfir-lab.sh status                             guests, network mode, disk, lesson dir
 #   dfir-lab.sh ssh   win|sift|vol2 [cmd...]
-#   dfir-lab.sh usb                                    list host USB devices
-#   dfir-lab.sh usb   attach <bus> <addr> | detach     hot-plug a USB device into Windows (FTK Imager lab)
-#   dfir-lab.sh dump  win|sift|vol2                         memory dump -> today's case dir, sha256 logged
-#   dfir-lab.sh keys                                   one-time: key-based SSH into both guests
-#   dfir-lab.sh baseline [win] [sift] [vol2]                  re-take baseline snapshots (guests stopped)
+#   dfir-lab.sh put   win|sift|vol2 <file> [dir]   copy a file into a guest (default dir: win C:/Cases/, linux ~/)
+#   dfir-lab.sh get   win|sift|vol2 <path> [evidence|cases]
+#                                                  copy out of a guest -> $DF/<evidence|cases>/received/<date>/, sha256 + note
+#   dfir-lab.sh usb                                list host USB devices and USB disks
+#   dfir-lab.sh usb   attach-ro /dev/sdX           USB disk -> Windows as READ-ONLY mass storage (FTK Imager lab)
+#   dfir-lab.sh usb   attach <bus> <addr>          raw USB passthrough into Windows (writable: not for evidence)
+#   dfir-lab.sh usb   detach
+#   dfir-lab.sh dump  win|sift|vol2                memory dump -> today's case dir, sha256 logged
+#   dfir-lab.sh keys                               one-time: key-based SSH into the guests
+#   dfir-lab.sh baseline [win] [sift] [vol2]       re-take baseline snapshots (guests stopped)
 #
 # --net   : guests get internet (updates, symbol downloads); default is isolated (restrict=on), SSH only
-# --clean : revert guests to their baseline snapshot before boot
+# --clean : revert guests to their baseline snapshot before boot (discards everything inside the guest,
+#           including C:\Cases on Windows: 'get' your exports first)
 set -euo pipefail
 shopt -u patsub_replacement 2>/dev/null || true
 
@@ -29,27 +35,34 @@ declare -A PORT=([win]=2222 [sift]=2223 [vol2]=2224)
 declare -A USERN=([win]=analyst [sift]=sansforensics [vol2]=vagrant)
 declare -A RAM_G=([win]=4 [sift]=4 [vol2]=4)   # must match RAM= in the launchers
 declare -A DISK=([win]=win11.qcow2 [sift]=sift.qcow2 [vol2]=vol2.qcow2)
+ALL=(win sift vol2)
 
 c()    { printf '\e[1;36m== %s\e[0m\n' "$*"; }
 ok()   { printf '   \e[32mok\e[0m %s\n' "$*"; }
 warn() { printf '   \e[33m!!\e[0m %s\n' "$*" >&2; }
 die()  { printf '\e[31mxx %s\e[0m\n' "$*" >&2; exit 1; }
 
-valid()   { [[ -n "$1" ]] && [[ -n "${NAME[$1]:-}" ]] || die "unknown guest '$1' (win|sift|vol2)"; }
+valid()   { [[ -n "$1" ]] && [[ -n "${NAME[$1]:-}" ]] || die "unknown guest '${1:-}' (win|sift|vol2)"; }
 pat()     { printf -- '^qemu-system-x86_64 .*-name %s( |$)' "${NAME[$1]}"; }
 running() { pgrep -f -- "$(pat "$1")" >/dev/null; }
+netmode() { if pgrep -af -- "$(pat "$1")" | grep -q 'restrict=on'; then echo run; else echo net; fi; }
 mon()     { printf '%s\n' "$2" | socat - "UNIX-CONNECT:$IMG/${NAME[$1]}/mon.sock"; }
+monq()    { mon "$@" | grep -v '^QEMU\|^(qemu)' || true; }   # monitor reply without banner/echo
 banner()  { timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.1/$1 && head -c 4 <&3" 2>/dev/null | grep -q '^SSH-'; }
 ssh_opts() { printf '%s\n' -i "$KEY" -o IdentitiesOnly=yes -p "${PORT[$1]}" -o StrictHostKeyChecking=accept-new \
                -o UserKnownHostsFile="$KNOWN" -o LogLevel=ERROR; }
+scp_opts() { printf '%s\n' -i "$KEY" -o IdentitiesOnly=yes -P "${PORT[$1]}" -o StrictHostKeyChecking=accept-new \
+               -o UserKnownHostsFile="$KNOWN" -o LogLevel=ERROR; }   # scp: -P is the port, -p would mean "preserve"
 sshb()    { local g=$1; shift; mapfile -t o < <(ssh_opts "$g")
             ssh -n "${o[@]}" -o BatchMode=yes -o ConnectTimeout=5 "${USERN[$g]}@127.0.0.1" "$@"; }
 sshi()    { local g=$1; shift; mapfile -t o < <(ssh_opts "$g")
             ssh "${o[@]}" "${USERN[$g]}@127.0.0.1" "$@"; }
 note()    { [[ -f "$LESSON/notes.md" ]] && printf -- '- %s: %s\n' "$(date +%T)" "$*" >> "$LESSON/notes.md" || true; }
 
+# default: win + sift, plus vol2 when it is up (so a bare 'stop' never leaves it running).
+# 'if' rather than '&&': under set -e a false '&&' as the function's last command aborts the script.
 set_guests()  { GS=(); for a in "$@"; do valid "$a"; GS+=("$a"); done
-                ((${#GS[@]})) || { GS=(win sift); running vol2 && GS+=(vol2); }; }
+                if ((${#GS[@]} == 0)); then GS=(win sift); if running vol2; then GS+=(vol2); fi; fi; }
 psenc()       { printf '%s' "$1" | iconv -f UTF-8 -t UTF-16LE | base64 -w0; }
 
 wait_vault() {
@@ -69,11 +82,11 @@ preflight() {
   done
   local free need=0 avail
   free=$(df --output=avail -BG "$IMG" | tail -1 | tr -dc 0-9)
-  (( free >= 20 )) && ok "disk: ${free} GiB free" || warn "disk: only ${free} GiB free on $IMG"
+  if (( free >= 20 )); then ok "disk: ${free} GiB free"; else warn "disk: only ${free} GiB free on $IMG"; fi
   for g in "$@"; do running "$g" || need=$((need + RAM_G[$g])); done
   avail=$(awk '/MemAvailable/ {print int($2/1048576)}' /proc/meminfo)
-  (( avail >= need )) && ok "RAM: ${avail} GiB available, ${need} GiB needed" \
-                      || warn "RAM: ${avail} GiB available, ${need} GiB needed — expect swapping"
+  if (( avail >= need )); then ok "RAM: ${avail} GiB available, ${need} GiB needed"
+  else warn "RAM: ${avail} GiB available, ${need} GiB needed — expect swapping"; fi
 }
 
 revert() {
@@ -96,7 +109,7 @@ lesson_notes() {
       echo "# Forensics lesson $TODAY"
       echo
       echo "- host: $(uname -n) $(uname -r)"
-      for g in win sift vol2; do
+      for g in "${ALL[@]}"; do
         echo "- $g baseline: $(qemu-img snapshot -l -U "$IMG/${NAME[$g]}/${DISK[$g]}" 2>/dev/null \
                                | awk '$2=="baseline" {print $(NF-3), $(NF-2)}')"
       done
@@ -137,13 +150,13 @@ summary() {
   cat <<EOF
 
 $(c ready)
-   cases today : $LESSON   (SIFT: /mnt/cases/$TODAY)
-   evidence    : $DF/evidence   (SIFT: /mnt/evidence, read-only)
-   ssh         : dfir-lab.sh ssh win | dfir-lab.sh ssh sift | dfir-lab.sh ssh vol2
-   to Windows  : scp -P 2222 -i $KEY <file> analyst@127.0.0.1:C:/Cases/
-   USB (FTK)   : dfir-lab.sh usb  →  dfir-lab.sh usb attach <bus> <addr>
+   cases today : $LESSON   (guests: /mnt/cases/$TODAY)
+   evidence    : $DF/evidence   (guests: /mnt/evidence, read-only)
+   ssh         : dfir-lab.sh ssh win|sift|vol2
+   files       : dfir-lab.sh put win <file>   |   dfir-lab.sh get win C:/Cases/<file> [evidence|cases]
+   USB (FTK)   : dfir-lab.sh usb  →  dfir-lab.sh usb attach-ro /dev/sdX   (detach: dfir-lab.sh usb detach)
    memory dump : dfir-lab.sh dump win|sift|vol2
-   E01 in SIFT : sudo ewfmount /mnt/evidence/<x>.E01 /mnt/e01 && sudo mmls /mnt/e01/ewf1
+   E01 in SIFT : sudo mkdir -p /mnt/e01 && sudo ewfmount /mnt/evidence/received/<date>/<x>.E01 /mnt/e01 && sudo mmls /mnt/e01/ewf1
    end         : dfir-lab.sh stop
 EOF
 }
@@ -163,7 +176,13 @@ cmd_start() {
   c "boot ($mode)"
   local how=$mode; (( clean )) && how+=", clean"
   for g in "${GS[@]}"; do
-    if running "$g"; then ok "$g already running"; continue; fi
+    if running "$g"; then
+      local cur; cur=$(netmode "$g")
+      if [[ $cur == "$mode" ]]; then ok "$g already running ($cur)"
+      else warn "$g already running in '$cur' mode, not '$mode': dfir-lab.sh stop $g first to switch"; fi
+      (( clean )) && warn "$g running: not reverted"
+      continue
+    fi
     (( clean )) && revert "$g"
     local log="$IMG/${NAME[$g]}/qemu.log"
     setsid -f "${LAUNCH[$g]}" "$mode" > "$log" 2>&1 < /dev/null
@@ -205,9 +224,10 @@ cmd_stop() {
 
 cmd_status() {
   [[ -d "$DF" ]] && ok "vault mounted" || warn "vault locked"
-  for g in win sift vol2; do
+  for g in "${ALL[@]}"; do
     if running "$g"; then
-      banner "${PORT[$g]}" && ok "$g running, sshd up (:${PORT[$g]})" || warn "$g running, sshd not answering"
+      local m; m=$(netmode "$g"); [[ $m == run ]] && m=isolated || m=INTERNET
+      banner "${PORT[$g]}" && ok "$g running ($m), sshd up (:${PORT[$g]})" || warn "$g running ($m), sshd not answering"
     else
       printf '   -- %s stopped\n' "$g"
     fi
@@ -219,10 +239,12 @@ cmd_status() {
 cmd_keys() {
   [[ -f "$KEY" ]] || ssh-keygen -t ed25519 -N '' -C dfir-lab -f "$KEY"
   local pub; pub=$(<"$KEY.pub")
-  if banner 2223; then
-    ssh-copy-id -i "$KEY.pub" -p 2223 -o UserKnownHostsFile="$KNOWN" -o StrictHostKeyChecking=accept-new \
-      sansforensics@127.0.0.1
-  else warn "sift not reachable: skipped"; fi
+  for g in sift vol2; do
+    if banner "${PORT[$g]}"; then
+      ssh-copy-id -i "$KEY.pub" -p "${PORT[$g]}" -o UserKnownHostsFile="$KNOWN" -o StrictHostKeyChecking=accept-new \
+        "${USERN[$g]}@127.0.0.1"
+    else warn "$g not reachable: skipped"; fi
+  done
   if banner 2222; then
     # quotes don't survive Windows sshd -> powershell -c; ship the script as -EncodedCommand
     # sshd rejects administrators_authorized_keys unless owner + ACL are only Administrators/SYSTEM
@@ -250,7 +272,7 @@ Select-String -Path "C:\ProgramData\ssh\sshd_config" -Pattern "^\s*Match Group a
     ssh -n -p 2222 -o UserKnownHostsFile="$KNOWN" -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR analyst@127.0.0.1 \
       "powershell -NoProfile -NonInteractive -InputFormat None -EncodedCommand $(psenc "${ps//__PUB__/$pub}")"
   else warn "win not reachable: skipped"; fi
-  for g in win sift vol2; do banner "${PORT[$g]}" && { sshb "$g" exit && ok "$g: key auth works" || warn "$g: key auth failed"; }; done
+  for g in "${ALL[@]}"; do banner "${PORT[$g]}" && { sshb "$g" exit && ok "$g: key auth works" || warn "$g: key auth failed"; }; done
   echo "   Keys live inside the guests now: run 'dfir-lab.sh stop && dfir-lab.sh baseline' so --clean keeps them."
 }
 
@@ -290,21 +312,89 @@ cmd_dump() {
   ok "in SIFT: vol -f /mnt/cases/$TODAY/mem/$(basename "$out") <plugin>"
 }
 
+cmd_put() {
+  local g=${1:-}; valid "$g"
+  local src=${2:?usage: put <guest> <file> [dir]}
+  [[ -f "$src" ]] || die "no such file: $src"
+  running "$g" || die "$g not running"
+  local dst=${3:-}; [[ -n $dst ]] || { [[ $g == win ]] && dst='C:/Cases/' || dst='~/'; }
+  mapfile -t o < <(scp_opts "$g")
+  scp "${o[@]}" "$src" "${USERN[$g]}@127.0.0.1:$dst" || die "scp failed"
+  local h; h=$(sha256sum "$src" | cut -d' ' -f1)
+  ok "$(basename "$src") -> $g:$dst  (sha256 $h)"
+  note "put $(basename "$src") -> $g:$dst (sha256 $h)"
+}
+
+cmd_get() {
+  local g=${1:-}; valid "$g"
+  local src=${2:?usage: get <guest> <remote path, e.g. C:/Cases/usb.E01> [evidence|cases]}
+  local where=${3:-evidence}
+  [[ $where == evidence || $where == cases ]] || die "destination must be 'evidence' or 'cases'"
+  running "$g" || die "$g not running"
+  [[ -d "$DF" ]] || die "vault locked"
+  mkdir -p "$LESSON"
+  local rel="$where/received/$TODAY" dir tmp p f n=0
+  dir="$DF/$rel"; mkdir -p "$dir"
+  # copy into a fresh dir first: never overwrite, and hash exactly what arrived (globs like C:/Cases/usb.E0* work)
+  tmp=$(mktemp -d "$dir/.incoming.XXXXXX")
+  mapfile -t o < <(scp_opts "$g")
+  scp "${o[@]}" "${USERN[$g]}@127.0.0.1:$src" "$tmp/" || { rmdir "$tmp" 2>/dev/null; die "scp failed"; }
+  for p in "$tmp"/* "$tmp"/.[!.]*; do
+    [[ -e "$p" ]] || continue
+    f=${p##*/}
+    if [[ -e "$dir/$f" ]]; then warn "$f already in $rel — new copy left in ${tmp#"$DF/"}"; continue; fi
+    mv "$p" "$dir/$f"
+    (cd "$DF" && sha256sum "$rel/$f") | tee -a "$LESSON/hashes.txt"
+    note "received $f from $g:$src -> $rel/"
+    n=$((n + 1))
+  done
+  rmdir "$tmp" 2>/dev/null || true
+  (( n )) && ok "$n file(s) in $rel (guests: /mnt/$rel)" || warn "nothing new copied"
+}
+
 cmd_usb() {
   case ${1:-} in
-    "") lsusb; echo "   attach: dfir-lab.sh usb attach <Bus> <Device>   (numbers from above)" ;;
+    "")
+      lsusb
+      echo
+      lsblk -dpo NAME,TRAN,SIZE,RO,MODEL,SERIAL | awk 'NR==1 || $2=="usb"'
+      echo "   evidence disk : dfir-lab.sh usb attach-ro /dev/sdX   (read-only for Windows)"
+      echo "   raw device    : dfir-lab.sh usb attach <Bus> <Device> (writable passthrough, numbers from lsusb)"
+      ;;
+    attach-ro)
+      local dev=${2:?usage: usb attach-ro /dev/sdX} p
+      [[ -b "$dev" ]] || die "$dev is not a block device"
+      [[ $(lsblk -dno TYPE "$dev") == disk ]] || die "$dev is a partition: pass the whole disk (e.g. /dev/sdb)"
+      [[ $(lsblk -dno TRAN "$dev") == usb ]] || die "$dev is not a USB disk — refusing (wrong disk = your host)"
+      running win || die "win not running"
+      findmnt -rno SOURCE | grep -q "^$dev" && die "$dev (or a partition) is mounted on the host — unmount it first"
+      for p in $(lsblk -lnpo NAME "$dev"); do sudo blockdev --setro "$p"; done
+      sudo chown "$USER" "$dev"
+      local r; r=$(monq win "drive_add 0 if=none,id=usbro,file=$dev,format=raw,readonly=on,cache=none")
+      [[ $r == *OK* || -z $r ]] || die "drive_add: $r"
+      r=$(monq win "device_add usb-storage,drive=usbro,id=usbrodev,removable=on")
+      [[ -z $r ]] || die "device_add: $r"
+      ok "$dev attached read-only to win (write-protected disk) — FTK: Create Disk Image → Physical Drive"
+      note "USB attach read-only $dev ($(lsblk -dno MODEL,SERIAL,SIZE "$dev" | xargs)) -> win"
+      ;;
     attach)
       local b=$((10#${2:?bus})) a=$((10#${3:?addr}))
       running win || die "win not running"
+      warn "raw passthrough: Windows can WRITE to this device — use attach-ro for evidence"
       sudo chown "$USER" "/dev/bus/usb/$(printf %03d "$b")/$(printf %03d "$a")"
-      mon win "device_add usb-host,hostbus=$b,hostaddr=$a,id=usbev" | grep -v '^QEMU\|^(qemu)' || true
-      ok "attached bus $b addr $a to win (id usbev)"; note "USB attach bus $b addr $a -> win"
+      monq win "device_add usb-host,hostbus=$b,hostaddr=$a,id=usbev"
+      ok "attached bus $b addr $a to win (id usbev)"; note "USB attach (raw, writable) bus $b addr $a -> win"
       ;;
     detach)
-      mon win "device_del usbev" | grep -v '^QEMU\|^(qemu)' || true
-      ok "detached usbev"; note "USB detach"
+      running win || die "win not running"
+      local id r n=0
+      for id in usbrodev usbev; do
+        r=$(monq win "device_del $id")
+        [[ -z $r ]] && { ok "detached $id"; note "USB detach $id"; n=$((n + 1)); }
+      done
+      (( n )) || warn "nothing attached"
       ;;
-    *) die "usb [attach <bus> <addr> | detach]" ;;
+    *) die "usb [attach-ro /dev/sdX | attach <bus> <addr> | detach]" ;;
   esac
 }
 
@@ -315,9 +405,11 @@ case ${1:-} in
   stop)     shift; cmd_stop "$@" ;;
   status)   cmd_status ;;
   ssh)      shift; cmd_ssh "$@" ;;
+  put)      shift; cmd_put "$@" ;;
+  get)      shift; cmd_get "$@" ;;
   usb)      shift; cmd_usb "$@" ;;
   dump)     shift; cmd_dump "$@" ;;
   keys)     cmd_keys ;;
   baseline) shift; cmd_baseline "$@" ;;
-  *)        sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *)        sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
