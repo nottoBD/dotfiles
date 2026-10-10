@@ -5,6 +5,7 @@ Case data lives in the Cryptomator vault (unlock first):
 `DF=~/.local/share/Cryptomator/mnt/synthesis/digital_forensics_rma_ma2` → `evidence/` (ro in guests), `cases/` (rw).
 
 ```
+bin/dfir-lab.sh          lesson runner: start|stop|status|ssh|usb|dump|keys|baseline
 bin/win11-dfir.sh        install|run|net   SSH 127.0.0.1:2222 (analyst)
 bin/sift-dfir.sh         run|net           SSH 127.0.0.1:2223 (sansforensics), 9p evidence(ro)/cases(rw)
 bin/fetch-labs.sh        course exercise files -> $DF/evidence/labs, hashes -> $DF/cases
@@ -15,6 +16,17 @@ guest/sift/setup.sh      9p fstab, RegRipper fix, tool check
 iso/SHA256SUMS           expected ISO/OVA hashes (sha256sum -c --ignore-missing)
 ```
 `run` = isolated NIC (`restrict=on`, no internet, SSH works). `net` = internet.
+
+## Each lesson
+```
+dfir-lab.sh start            # vault check, boot both guests isolated, SSH wait, sanity checks, cases/<date>/notes.md
+dfir-lab.sh start --net      # same, with internet (updates, Volatility symbols)
+dfir-lab.sh start --clean    # revert to baseline first
+dfir-lab.sh usb attach B D   # FTK lab: hot-plug USB key into Windows
+dfir-lab.sh dump win         # memory dump -> cases/<date>/mem/, sha256 -> cases/<date>/hashes.txt
+dfir-lab.sh stop
+```
+One-time after install: `dfir-lab.sh keys` (key auth for both guests), then `dfir-lab.sh stop && dfir-lab.sh baseline`.
 
 ## Rebuild from zero
 1. Download ISOs into `~/vm/iso` (Windows: microsoft.com/software-download/windows11, multi-edition x64 English; SIFT OVA: sans.org).
