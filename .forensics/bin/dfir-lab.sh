@@ -27,7 +27,7 @@ declare -A NAME=([win]=win11-dfir [sift]=sift)
 declare -A LAUNCH=([win]=win11-dfir.sh [sift]=sift-dfir.sh)
 declare -A PORT=([win]=2222 [sift]=2223)
 declare -A USERN=([win]=analyst [sift]=sansforensics)
-declare -A RAM_G=([win]=6 [sift]=4)
+declare -A RAM_G=([win]=4 [sift]=4)   # must match RAM= in the launchers
 declare -A DISK=([win]=win11.qcow2 [sift]=sift.qcow2)
 
 c()    { printf '\e[1;36m== %s\e[0m\n' "$*"; }
@@ -43,7 +43,7 @@ banner()  { timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.1/$1 && head -c 4 <&3" 2
 ssh_opts() { printf '%s\n' -i "$KEY" -p "${PORT[$1]}" -o StrictHostKeyChecking=accept-new \
                -o UserKnownHostsFile="$KNOWN" -o LogLevel=ERROR; }
 sshb()    { local g=$1; shift; mapfile -t o < <(ssh_opts "$g")
-            ssh "${o[@]}" -o BatchMode=yes -o ConnectTimeout=5 "${USERN[$g]}@127.0.0.1" "$@"; }
+            ssh -n "${o[@]}" -o BatchMode=yes -o ConnectTimeout=5 "${USERN[$g]}@127.0.0.1" "$@"; }
 sshi()    { local g=$1; shift; mapfile -t o < <(ssh_opts "$g")
             ssh "${o[@]}" "${USERN[$g]}@127.0.0.1" "$@"; }
 note()    { [[ -f "$LESSON/notes.md" ]] && printf -- '- %s: %s\n' "$(date +%T)" "$*" >> "$LESSON/notes.md" || true; }
@@ -228,8 +228,9 @@ cmd_keys() {
     local ps='$f = "C:\ProgramData\ssh\administrators_authorized_keys"
 if (-not (Test-Path $f) -or -not (Select-String -Path $f -SimpleMatch "__PUB__" -Quiet)) { Add-Content -Path $f -Value "__PUB__" }
 icacls $f /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F" | Out-Null'
-    ssh -p 2222 -o UserKnownHostsFile="$KNOWN" -o StrictHostKeyChecking=accept-new analyst@127.0.0.1 \
-      "powershell -NoProfile -EncodedCommand $(psenc "${ps//__PUB__/$pub}")"
+    # -n + -InputFormat None: Windows PowerShell 5.1 otherwise blocks reading the (redirected) stdin
+    ssh -n -p 2222 -o UserKnownHostsFile="$KNOWN" -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR analyst@127.0.0.1 \
+      "powershell -NoProfile -NonInteractive -InputFormat None -EncodedCommand $(psenc "${ps//__PUB__/$pub}")"
   else warn "win not reachable: skipped"; fi
   for g in win sift; do banner "${PORT[$g]}" && { sshb "$g" exit && ok "$g: key auth works" || warn "$g: key auth failed"; }; done
   echo "   Keys live inside the guests now: run 'dfir-lab.sh stop && dfir-lab.sh baseline' so --clean keeps them."
