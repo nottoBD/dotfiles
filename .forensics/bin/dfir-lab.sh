@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # dfir-lab.sh — lesson runner for the forensics lab
 #
-#   dfir-lab.sh start [--net] [--clean] [win] [sift]   boot guests (default: both, isolated), checks, lesson notes
-#   dfir-lab.sh stop  [win] [sift]                     ACPI shutdown, wait for exit
+#   dfir-lab.sh start [--net] [--clean] [win] [sift] [vol2]   boot guests (default: both, isolated), checks, lesson notes
+#   dfir-lab.sh stop  [win] [sift] [vol2]                     ACPI shutdown, wait for exit
 #   dfir-lab.sh status
-#   dfir-lab.sh ssh   win|sift [cmd...]
+#   dfir-lab.sh ssh   win|sift|vol2 [cmd...]
 #   dfir-lab.sh usb                                    list host USB devices
 #   dfir-lab.sh usb   attach <bus> <addr> | detach     hot-plug a USB device into Windows (FTK Imager lab)
-#   dfir-lab.sh dump  win|sift                         memory dump -> today's case dir, sha256 logged
+#   dfir-lab.sh dump  win|sift|vol2                         memory dump -> today's case dir, sha256 logged
 #   dfir-lab.sh keys                                   one-time: key-based SSH into both guests
-#   dfir-lab.sh baseline [win] [sift]                  re-take baseline snapshots (guests stopped)
+#   dfir-lab.sh baseline [win] [sift] [vol2]                  re-take baseline snapshots (guests stopped)
 #
 # --net   : guests get internet (updates, symbol downloads); default is isolated (restrict=on), SSH only
 # --clean : revert guests to their baseline snapshot before boot
@@ -23,19 +23,19 @@ KNOWN="$HOME/.ssh/known_hosts_dfir"
 TODAY=$(date +%F)
 LESSON="$DF/cases/$TODAY"
 
-declare -A NAME=([win]=win11-dfir [sift]=sift)
-declare -A LAUNCH=([win]=win11-dfir.sh [sift]=sift-dfir.sh)
-declare -A PORT=([win]=2222 [sift]=2223)
-declare -A USERN=([win]=analyst [sift]=sansforensics)
-declare -A RAM_G=([win]=4 [sift]=4)   # must match RAM= in the launchers
-declare -A DISK=([win]=win11.qcow2 [sift]=sift.qcow2)
+declare -A NAME=([win]=win11-dfir [sift]=sift [vol2]=vol2)
+declare -A LAUNCH=([win]=win11-dfir.sh [sift]=sift-dfir.sh [vol2]=vol2-dfir.sh)
+declare -A PORT=([win]=2222 [sift]=2223 [vol2]=2224)
+declare -A USERN=([win]=analyst [sift]=sansforensics [vol2]=vagrant)
+declare -A RAM_G=([win]=4 [sift]=4 [vol2]=4)   # must match RAM= in the launchers
+declare -A DISK=([win]=win11.qcow2 [sift]=sift.qcow2 [vol2]=vol2.qcow2)
 
 c()    { printf '\e[1;36m== %s\e[0m\n' "$*"; }
 ok()   { printf '   \e[32mok\e[0m %s\n' "$*"; }
 warn() { printf '   \e[33m!!\e[0m %s\n' "$*" >&2; }
 die()  { printf '\e[31mxx %s\e[0m\n' "$*" >&2; exit 1; }
 
-valid()   { [[ -n "$1" ]] && [[ -n "${NAME[$1]:-}" ]] || die "unknown guest '$1' (win|sift)"; }
+valid()   { [[ -n "$1" ]] && [[ -n "${NAME[$1]:-}" ]] || die "unknown guest '$1' (win|sift|vol2)"; }
 pat()     { printf -- '^qemu-system-x86_64 .*-name %s( |$)' "${NAME[$1]}"; }
 running() { pgrep -f -- "$(pat "$1")" >/dev/null; }
 mon()     { printf '%s\n' "$2" | socat - "UNIX-CONNECT:$IMG/${NAME[$1]}/mon.sock"; }
@@ -49,7 +49,7 @@ sshi()    { local g=$1; shift; mapfile -t o < <(ssh_opts "$g")
 note()    { [[ -f "$LESSON/notes.md" ]] && printf -- '- %s: %s\n' "$(date +%T)" "$*" >> "$LESSON/notes.md" || true; }
 
 set_guests()  { GS=(); for a in "$@"; do valid "$a"; GS+=("$a"); done
-                ((${#GS[@]})) || GS=(win sift); }
+                ((${#GS[@]})) || { GS=(win sift); running vol2 && GS+=(vol2); }; }
 psenc()       { printf '%s' "$1" | iconv -f UTF-8 -t UTF-16LE | base64 -w0; }
 
 wait_vault() {
@@ -64,7 +64,7 @@ wait_vault() {
 
 preflight() {
   [[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm not usable"
-  for b in qemu-system-x86_64 swtpm socat "${LAUNCH[win]}" "${LAUNCH[sift]}"; do
+  for b in qemu-system-x86_64 swtpm socat "${LAUNCH[@]}"; do
     command -v "$b" >/dev/null || die "missing: $b"
   done
   local free need=0 avail
@@ -96,7 +96,7 @@ lesson_notes() {
       echo "# Forensics lesson $TODAY"
       echo
       echo "- host: $(uname -n) $(uname -r)"
-      for g in win sift; do
+      for g in win sift vol2; do
         echo "- $g baseline: $(qemu-img snapshot -l -U "$IMG/${NAME[$g]}/${DISK[$g]}" 2>/dev/null \
                                | awk '$2=="baseline" {print $(NF-3), $(NF-2)}')"
       done
@@ -119,10 +119,10 @@ post_checks() {
     return
   fi
   case $g in
-    sift)
-      sshb sift 'mountpoint -q /mnt/evidence && mountpoint -q /mnt/cases' \
-        && ok "sift: /mnt/evidence (ro) + /mnt/cases mounted" \
-        || warn "sift: 9p shares not mounted — ssh in and: sudo mount -a"
+    sift|vol2)
+      sshb "$g" 'mountpoint -q /mnt/evidence && mountpoint -q /mnt/cases' \
+        && ok "$g: /mnt/evidence (ro) + /mnt/cases mounted" \
+        || warn "$g: 9p shares not mounted — ssh in and: sudo mount -a"
       ;;
     win)
       local rtp
@@ -139,10 +139,10 @@ summary() {
 $(c ready)
    cases today : $LESSON   (SIFT: /mnt/cases/$TODAY)
    evidence    : $DF/evidence   (SIFT: /mnt/evidence, read-only)
-   ssh         : dfir-lab.sh ssh win | dfir-lab.sh ssh sift
+   ssh         : dfir-lab.sh ssh win | dfir-lab.sh ssh sift | dfir-lab.sh ssh vol2
    to Windows  : scp -P 2222 -i $KEY <file> analyst@127.0.0.1:C:/Cases/
    USB (FTK)   : dfir-lab.sh usb  →  dfir-lab.sh usb attach <bus> <addr>
-   memory dump : dfir-lab.sh dump win|sift
+   memory dump : dfir-lab.sh dump win|sift|vol2
    E01 in SIFT : sudo ewfmount /mnt/evidence/<x>.E01 /mnt/e01 && sudo mmls /mnt/e01/ewf1
    end         : dfir-lab.sh stop
 EOF
@@ -205,7 +205,7 @@ cmd_stop() {
 
 cmd_status() {
   [[ -d "$DF" ]] && ok "vault mounted" || warn "vault locked"
-  for g in win sift; do
+  for g in win sift vol2; do
     if running "$g"; then
       banner "${PORT[$g]}" && ok "$g running, sshd up (:${PORT[$g]})" || warn "$g running, sshd not answering"
     else
@@ -250,7 +250,7 @@ Select-String -Path "C:\ProgramData\ssh\sshd_config" -Pattern "^\s*Match Group a
     ssh -n -p 2222 -o UserKnownHostsFile="$KNOWN" -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR analyst@127.0.0.1 \
       "powershell -NoProfile -NonInteractive -InputFormat None -EncodedCommand $(psenc "${ps//__PUB__/$pub}")"
   else warn "win not reachable: skipped"; fi
-  for g in win sift; do banner "${PORT[$g]}" && { sshb "$g" exit && ok "$g: key auth works" || warn "$g: key auth failed"; }; done
+  for g in win sift vol2; do banner "${PORT[$g]}" && { sshb "$g" exit && ok "$g: key auth works" || warn "$g: key auth failed"; }; done
   echo "   Keys live inside the guests now: run 'dfir-lab.sh stop && dfir-lab.sh baseline' so --clean keeps them."
 }
 

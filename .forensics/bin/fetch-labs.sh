@@ -45,7 +45,31 @@ done <<< "$LIST"
 
 # Volatility 2 VM from the memory slides (VirtualBox OVA) -> ~/vm/iso
 OVA="$HOME/vm/iso/mint-19.3-volatility.ova"
-[[ -e "$OVA" ]] || curl -fL -o "$OVA" https://cylab.be/s/jfp0o || rm -f "$OVA"
+OVA_URL=https://cylab.be/s/jfp0o
+ova_ok() { tar -tf "$1" >/dev/null 2>&1; }      # GNU tar seeks over members: fast, catches truncation
 
-(cd "$LABS" && find . -type f ! -name '.*' -print0 | sort -z | xargs -0 -r sha256sum) > "$DF/cases/hashes-labs.txt"
-echo "hashes -> $DF/cases/hashes-labs.txt"
+if [[ -e "$OVA" ]] && ova_ok "$OVA"; then
+    echo "skip $(basename "$OVA")"
+else
+    [[ -e "$OVA" ]] && mv "$OVA" "$OVA.part"    # adopt a broken leftover as a resume point
+    curl -fL -C - -o "$OVA.part" "$OVA_URL"; rc=$?
+    if [[ $rc -eq 33 ]]; then                   # server refused byte ranges → restart clean
+        rm -f "$OVA.part"; curl -fL -o "$OVA.part" "$OVA_URL"; rc=$?
+    fi
+    if [[ $rc -eq 0 ]] && ova_ok "$OVA.part"; then
+        mv "$OVA.part" "$OVA"; echo "get  $(basename "$OVA")"
+    else
+        echo "FAIL $OVA_URL (curl rc=$rc, partial kept: $OVA.part)" >&2
+    fi
+fi
+
+CUR="$DF/cases/hashes-labs.txt"
+REF="$DF/cases/hashes-labs.2026-10-10.txt"      # frozen reference, chmod 444
+(cd "$LABS" && find . -type f ! -name '.*' -print0 | sort -z | xargs -0 -r sha256sum) > "$CUR"
+echo "hashes -> $CUR"
+if [[ -e "$REF" ]]; then
+    (cd "$LABS" && sha256sum --quiet -c "$REF") && echo "verify: all reference hashes OK" \
+        || echo "verify: MISMATCH against $REF" >&2
+    new=$(comm -13 <(awk '{print $2}' "$REF" | sort) <(awk '{print $2}' "$CUR" | sort))
+    [[ -n "$new" ]] && printf 'new (not in reference):\n%s\n' "$new"
+fi
