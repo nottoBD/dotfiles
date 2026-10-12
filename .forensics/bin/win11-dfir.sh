@@ -42,6 +42,8 @@ args=(
   -name win11-dfir
   # smm + secure pflash: required by the Secure Boot OVMF build (26H2 setup checks Secure Boot capability)
   -machine q35,accel=kvm,smm=on
+  -global ICH9-LPC.disable_s3=1
+  -global ICH9-LPC.disable_s4=1
   -global driver=cfi.pflash01,property=secure,value=on
   # -svm: hide AMD-V from the guest -> no VBS/HVCI, cleaner memory images
   -cpu host,-svm,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,hv_time,hv_vpindex,hv_synic,hv_stimer,hv_frequencies
