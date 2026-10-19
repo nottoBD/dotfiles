@@ -3,7 +3,7 @@
 Course: Digital Forensics (cylab.be slides, v2025-12-16). Stated requirement: *a Windows machine + the SIFT Workstation*.
 Implementation: Artix host `penthrite`, three QEMU/KVM guests, case data in an encrypted vault, everything scripted and versioned in `~/projects/dotfiles/.forensics` (a subdirectory of the dotfiles repo). A second machine (Arch desktop, §7) carries an identical copy.
 
-Status as of 2026-10-19: **setup complete and validated end to end** on `penthrite` (all six checks of §5.2). Rebuild path updated with the 10-19 fixes (§5.1). Second machine: procedure and `dfir-push.sh` ready (§7), first copy pending. Lesson-day routine: §4.
+Status as of 2026-10-19: **setup complete and validated end to end** on `penthrite` (all six checks of §5.2). Rebuild path updated with the 10-19 fixes (§5.1). Second machine: guests, ISOs and key copied 2026-10-19 (all verified); large vault files and first start pending (§7). Lesson-day routine: §4.
 
 ---
 
@@ -43,7 +43,8 @@ Status as of 2026-10-19: **setup complete and validated end to end** on `penthri
  Network modes:  run = slirp restrict=on (no internet, SSH forward only)  |  net = slirp NAT with internet
 
  Second machine (§7): Arch desktop, devid@192.168.42.2 over direct Ethernet, Ryzen 5 2600, 15 GiB RAM,
- ext4 /home. Same user, same paths, same vault (synced by Cryptomator), guests copied with dfir-push.sh.
+ ext4 /home. Same user, same paths, same vault (synced through its own git repo; files ≥100 MiB copied by
+ dfir-push.sh), guests copied with dfir-push.sh.
 ```
 
 Why this shape:
@@ -168,7 +169,9 @@ Script: `~/projects/dotfiles/.forensics/bin/dfir-lab.sh` (edit here), run as `df
 4. Before stopping: `get` anything you produced inside Windows (`C:\Cases`) — a later `--clean` erases it.
 5. `dfir-lab.sh stop`. Then `rsync -a --delete ~/projects/dotfiles/.forensics/ $DF/scripts/` if you changed scripts.
 
-Run the lab on **one machine at a time** while the vault syncs: two hosts writing `cases/` at once produce Cryptomator sync conflicts.
+Run the lab on **one machine at a time**. The `synthesis` vault syncs through its own git repo (encrypted files, pushed to GitHub); `gitfit` keeps every file whose ciphertext is ≥100 MiB out of git. Before switching machines:
+1. On the machine you used: in the vault repo, `gitfit`, `git commit`, `git push`; then `dfir-push.sh <other> --vault-only` for the large files (E01s, dumps, extracted images).
+2. On the other machine: `git pull` in the vault repo, unlock the vault.
 
 | Chapter | Start | Typical commands |
 |---|---|---|
@@ -261,6 +264,7 @@ Shell: the host terminal is either **fish** or **bash** — check the prompt. Fi
 | Bare `dfir-lab.sh start` / `stop` exits silently | `set -e` + `running vol2 && …` returns 1 | `if running vol2; then …; fi` (fixed 2026-10-10) |
 | `dfir-push.sh`: "differs on the target (size/mtime)" | a baseline was re-taken on one machine | `--force` from the machine whose copy you want to keep |
 | `dfir-push.sh`: "missing on target: qemu-img…" / launchers not linked | target not bootstrapped | `bash ~/projects/dotfiles/.forensics/bootstrap/host.sh --no-guests` there |
+| A lab file present on one machine is missing on the other (first seen: `stuxnet.vmem.zip` on nitropenta) | the vault syncs through git and `gitfit` ignores files ≥100 MiB | `dfir-push.sh <other> --vault-only` |
 
 ---
 
@@ -277,7 +281,8 @@ Shell: the host terminal is either **fish** or **bash** — check the prompt. Fi
 | Windows `OVMF_VARS*.fd`, `tpm*/tpm2-00.permall` | < 1 MiB, travel with the Windows disk | both machines |
 | Lab ISOs/OVAs (Windows 8.5G, SIFT 8.9G, Mint 3.9G, virtio 0.8G) | ~22 GiB, pinned by `iso/SHA256SUMS` | both machines |
 | `~/.ssh/id_dfir_lab` | — | both machines (never git) |
-| Evidence, cases, Vol3 symbol cache | vault | Cryptomator sync |
+| Evidence, cases, Vol3 symbol cache (files < 100 MiB) | vault | vault git repo (`gitfit`, commit, push / pull) |
+| Vault files ≥ 100 MiB: lab zips such as `stuxnet.vmem.zip`, `extracted/` images, E01s, memory dumps | several GiB | both machines (`dfir-push.sh --vault-only`) |
 
 Over GitHub's limits (100 MiB per file, ~1 GB per repo recommended): disks and ISOs can never go to git. Two full copies on two machines are the backup; the ISOs make a rebuild possible even if a download link disappears.
 
@@ -285,9 +290,9 @@ Over GitHub's limits (100 MiB per file, ~1 GB per repo recommended): disks and I
 
 1. Laptop: commit + push the repo.
 2. Target: `git -C ~/projects/dotfiles pull --ff-only`, then `bash ~/projects/dotfiles/.forensics/bootstrap/host.sh --no-guests` (installs `qemu-desktop` — the target only had `qemu-base`, which lacks the GTK display — plus `socat`, `pv`; links the launchers).
-3. Laptop: `dfir-lab.sh stop`, then `dfir-push.sh devid@192.168.42.2`. One SSH password prompt for the whole run (multiplexed connection). Transport: GNU `tar --sparse` over SSH — holes skipped (vol2 is 1 TiB apparent), files byte-identical, internal snapshots kept. Verifies on the target: `qemu-img check` + baseline present on each disk, VARS/TPM sha256, ISOs against `SHA256SUMS`, lab files present in the vault.
+3. Laptop: `dfir-lab.sh stop`, then `dfir-push.sh devid@192.168.42.2` (vault unlocked on both: the run ends with the large vault files). One SSH password prompt for the whole run (multiplexed connection). Transport: GNU `tar --sparse` over SSH — holes skipped (vol2 is 1 TiB apparent), files byte-identical, internal snapshots kept. Verifies on the target: `qemu-img check` + baseline present on each disk, VARS/TPM sha256, ISOs against `SHA256SUMS`, lab files present in the vault.
 4. Target: unlock the vault, `dfir-lab.sh start --clean`, check the three guests as in §5.2-6, plug a test key and check nothing automounts.
 
-**Keeping the copies in step**: `penthrite` is the master. After re-taking a baseline there: `dfir-push.sh devid@192.168.42.2 --no-iso --force`. Files with the same size and mtime are skipped, so re-runs only send what changed (a whole disk, since qcow2 isn't diffed).
+**Keeping the copies in step**: the machine that last re-took a baseline is the master. After re-taking one: `dfir-push.sh <other> --no-iso --force`. After a lesson that produced big evidence: `dfir-push.sh <other> --vault-only`. Files with the same size and mtime are skipped, so re-runs only send what changed (a whole disk, since qcow2 isn't diffed).
 
 **Portability notes for any further machine**: same user name and home path; Arch-family (`host.sh` uses pacman and `/usr/share/edk2/x64/`); on an **Intel** host change `-svm` to `-vmx` in `win11-dfir.sh`, otherwise Windows sees VT-x and may enable VBS.
