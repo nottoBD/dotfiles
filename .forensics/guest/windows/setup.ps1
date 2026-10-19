@@ -68,3 +68,12 @@ $orphans | ForEach-Object { Remove-ItemProperty $k $_ }
 
 Stop-Transcript | Out-Null
 Write-Host "Done. Manual: FTK Imager (exterro.com/ftk-downloads), Thumbcache Viewer (thumbcacheviewer.github.io)." -ForegroundColor Green
+
+# power + clock (2026-10-19)
+powercfg /change standby-timeout-ac 0
+powercfg /change hibernate-timeout-ac 0
+powercfg /change monitor-timeout-ac 0
+powercfg /hibernate off
+Set-TimeZone -Id UTC
+reg add HKLM\SYSTEM\CurrentControlSet\Control\TimeZoneInformation /v RealTimeIsUniversal /t REG_DWORD /d 1 /f
+Set-Service tzautoupdate -StartupType Disabled
