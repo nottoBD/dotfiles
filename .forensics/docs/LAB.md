@@ -125,7 +125,7 @@ Why this shape:
 | `bin/sift-dfir.sh` | SIFT launcher: `run` / `net`, 9p shares, refuses to start if the vault is locked |
 | `bin/vol2-dfir.sh` | Vol2 launcher: `run` / `net`, same 9p shares, port 2224, `DISK_BUS=ahci` fallback |
 | `bin/fetch-labs.sh` | lab files + Vol2 OVA. OVA: `.part` + resume + `tar -tf` check before rename. Flags files whose content doesn't match the extension (prints the `unzip` command). Hashes downloads only (not `extracted/`), verified against the frozen reference |
-| `bin/dfir-push.sh` | copy disks (with baselines), Windows VARS/TPM, lab ISOs and the guest SSH key to another machine with the same layout (§7) |
+| `bin/dfir-push.sh` | copy disks (with baselines), Windows VARS/TPM, lab ISOs and the guest SSH key to another machine with the same layout (§7). `--vault-only`: the vault files too large for its git sync, compared by sha256 and resent when they differ |
 | `bin/dfir-assess.sh` | read-only host check |
 | `bootstrap/host.sh` | rebuild from zero (idempotent; never overwrites disks/VARS/TPM). `--no-guests`: packages, layout, launchers only (target of `dfir-push.sh`). Layout works on btrfs (subvolume + nodatacow) and ext4. Builds `unattend.iso` only for a fresh Windows disk |
 | `guest/windows/{autounattend.xml,setup.ps1}` | Windows install + hardening (incl. power + clock) |
@@ -265,6 +265,7 @@ Shell: the host terminal is either **fish** or **bash** — check the prompt. Fi
 | `dfir-push.sh`: "differs on the target (size/mtime)" | a baseline was re-taken on one machine | `--force` from the machine whose copy you want to keep |
 | `dfir-push.sh`: "missing on target: qemu-img…" / launchers not linked | target not bootstrapped | `bash ~/projects/dotfiles/.forensics/bootstrap/host.sh --no-guests` there |
 | A lab file present on one machine is missing on the other (first seen: `stuxnet.vmem.zip` on nitropenta) | the vault syncs through git and `gitfit` ignores files ≥100 MiB | `dfir-push.sh <other> --vault-only` |
+| `dfir-push.sh --vault-only` printed `sending 0` and finished instantly; the copies on the target are all zeros (2026-10-19, first version) | the Cryptomator FUSE mount reports 0 allocated blocks per file, and `tar --sparse` archives a 0-block file as one big hole | fixed: plain tar for vault files, and every large vault file compared by sha256 on both machines; a differing copy is resent. Rerun `dfir-push.sh <other> --vault-only` |
 
 ---
 

@@ -118,10 +118,15 @@ EOF
 )
 }
 
-# push BASE FILE...: send the files (paths relative to BASE) to the same BASE on the target
+# push BASE FILE...: send the files (paths relative to BASE) to the same BASE on the target.
+# SPARSE=1 (disks, ISOs): tar --sparse skips holes, size counted from allocated blocks.
+# SPARSE=0 (vault): the Cryptomator FUSE mount reports 0 allocated blocks for every file, and
+#   tar --sparse archives such a file as one big hole (all zeros). So: plain tar, apparent size.
+# SENT: the files actually sent, for verification afterwards.
+SPARSE=1; SENT=()
 push() {
   local base=$1; shift
-  local send=() p l r bytes
+  local send=() p l r bytes topt=()
   for p in "$@"; do
     l=$(stat -c '%s %Y' "$base/$p")
     r=${RSTAT[$base/$p]:-}
@@ -135,15 +140,21 @@ push() {
       die "$p differs on the target (size/mtime): rerun with --force to replace it"
     fi
   done
+  SENT=("${send[@]}")
   (( ${#send[@]} )) || return 0
-  bytes=$(cd "$base" && du -cB1 -- "${send[@]}" | tail -1 | cut -f1)      # allocated, not apparent
+  if (( SPARSE )); then
+    topt=(--sparse)
+    bytes=$(cd "$base" && du -cB1 -- "${send[@]}" | tail -1 | cut -f1)    # allocated, not apparent
+  else
+    bytes=$(cd "$base" && stat -c %s -- "${send[@]}" | awk '{s+=$1} END {print s+0}')
+  fi
   (( bytes < rfree )) || die "not enough space on the target: need $(numfmt --to=iec "$bytes"), free $(numfmt --to=iec "$rfree")"
   rfree=$(( rfree - bytes ))
   info "sending $(numfmt --to=iec "$bytes"): ${send[*]}"
   if command -v pv >/dev/null; then
-    tar -C "$base" --sparse -cf - -- "${send[@]}" | pv -s "$bytes" | rsh "mkdir -p '$base' && tar -C '$base' -xpf -"
+    tar -C "$base" "${topt[@]}" -cf - -- "${send[@]}" | pv -s "$bytes" | rsh "mkdir -p '$base' && tar -C '$base' -xpf -"
   else
-    tar -C "$base" --sparse -cf - -- "${send[@]}" | rsh "mkdir -p '$base' && tar -C '$base' -xpf -"
+    tar -C "$base" "${topt[@]}" -cf - -- "${send[@]}" | rsh "mkdir -p '$base' && tar -C '$base' -xpf -"
   fi
   ok "sent ${#send[@]} file(s) to $base"
 }
@@ -229,9 +240,30 @@ else
     if (( 88 + s + 48 * ((s + 32767) / 32768) >= GITMAX )); then big+=("$rel"); else small+=("$rel"); fi
   done < <(find "$DF" -path "$DF/scripts" -prune -o -type f -print0)
 
-  bigabs=(); for f in "${big[@]}"; do bigabs+=("$DF/$f"); done
-  rstat_fill "${bigabs[@]}"
-  if (( ${#big[@]} )); then push "$DF" "${big[@]}"; else ok "no file over the git limit"; fi
+  # Evidence: compared by content, not size/mtime (a zero-filled copy has the same size and mtime).
+  if (( ${#big[@]} )); then
+    info "hashing ${#big[@]} large vault file(s) on both machines"
+    declare -A LH=() RH=()
+    while read -r h f; do LH[$f]=$h; done < <(cd "$DF" && sha256sum -- "${big[@]}")
+    while read -r h f; do RH[$f]=$h; done < <(rbash "$DF" "${big[@]}" <<'EOF'
+cd "$1"; shift; for f; do [[ -f $f ]] && sha256sum -- "$f"; done; true
+EOF
+)
+    need=()
+    for f in "${big[@]}"; do
+      if [[ ${RH[$f]:-} == "${LH[$f]}" ]]; then info "identical on target: $f"
+      elif [[ -n ${RH[$f]:-} ]]; then info "differs on target, resending: $f"; need+=("$f")
+      else need+=("$f"); fi
+    done
+    if (( ${#need[@]} )); then
+      SPARSE=0; push "$DF" "${need[@]}"; SPARSE=1
+      for f in "${need[@]}"; do printf '%s  %s\n' "${LH[$f]}" "$f"; done \
+        | rsh "cd '$DF' && sha256sum --quiet -c -" \
+        && ok "sent vault files identical (sha256)" || die "vault file hash mismatch on the target"
+    fi
+  else
+    ok "no file over the git limit"
+  fi
 
   # small files are git's job: only report those the target doesn't have yet
   mapfile -t rfiles < <(rbash "$DF" <<'EOF'
