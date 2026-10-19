@@ -714,7 +714,7 @@ myKeys c =
 
   ^++^ subKeys "Cycle non-empty workspaces"
   [ ("M-`",    addName "Next non-empty workspace" $ viewBy Next nonEmptyNonNSP)
-  , ("M-S-`",  addName "Prev non-empty workspace" $ viewBy Prev nonEmptyNonNSP)]
+  , ("M-C-`",  addName "Prev non-empty workspace" $ viewBy Prev nonEmptyNonNSP)]
 
   ^++^ subKeys "Pinned / Sticky windows"
   [ ("M-S-p", addName "Pin / unpin focused window (unpin returns it home)" $ togglePin)

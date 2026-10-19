@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# autoclick.sh — left-click N times every S seconds at the current pointer position.
+# Usage: ./autoclick.sh [interval_seconds=1] [clicks=3] [gap_ms=50]
+# Stop with Ctrl+C.
+#
+# Wayland -> ydotool (kernel uinput, works everywhere incl. X11)
+# X11     -> xdotool (if installed), else ydotool
+
+set -euo pipefail
+
+INTERVAL="${1:-1}"     # seconds between bursts (decimals OK: 0.5)
+CLICKS="${2:-3}"       # clicks per burst
+GAP_MS="${3:-50}"      # ms between clicks inside a burst
+
+if [[ -z "${WAYLAND_DISPLAY:-}" ]] && command -v xdotool >/dev/null; then
+    BACKEND=xdotool
+elif command -v ydotool >/dev/null; then
+    BACKEND=ydotool
+else
+    echo "Install one: sudo pacman -S ydotool   (or xdotool for X11 only)" >&2
+    exit 1
+fi
+
+if [[ $BACKEND == ydotool ]] && ! pgrep -u "$USER" -x ydotoold >/dev/null; then
+    [[ -w /dev/uinput ]] || { echo "No write access to /dev/uinput (see setup notes)." >&2; exit 1; }
+    ydotoold >/dev/null 2>&1 &
+    DAEMON_PID=$!
+    sleep 0.5   # let the virtual device register with the compositor
+fi
+
+cleanup() { [[ -n "${DAEMON_PID:-}" ]] && kill "$DAEMON_PID" 2>/dev/null; echo; exit 0; }
+trap cleanup INT TERM
+
+echo "[$BACKEND] $CLICKS clicks every ${INTERVAL}s — Ctrl+C to stop. Starting in 3s..."
+sleep 3
+
+while :; do
+    if [[ $BACKEND == xdotool ]]; then
+        xdotool click --repeat "$CLICKS" --delay "$GAP_MS" 1
+    else
+        # 0xC0 = left button down+up; next-delay applies per event, so halve it
+        ydotool click --repeat "$CLICKS" --next-delay "$((GAP_MS / 2))" 0xC0
+    fi
+    sleep "$INTERVAL"
+done

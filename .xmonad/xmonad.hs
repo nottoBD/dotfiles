@@ -1,4 +1,4 @@
-    -- Base
+    
 import XMonad
 import System.Directory
 import System.IO (hClose, hPutStr, hPutStrLn)
@@ -7,8 +7,13 @@ import System.Exit (exitSuccess)
 import qualified XMonad.StackSet as W
 
     -- Actions
-import XMonad.Actions.CopyWindow (kill1, copy, killAllOtherCopies)
-import XMonad.Actions.CycleWS (Direction1D(..), moveTo, shiftTo, WSType(..), nextScreen, prevScreen)
+--for window pinning
+import XMonad.Actions.CopyWindow (kill1)
+import qualified XMonad.Util.ExtensibleState as XS
+import XMonad.Util.WorkspaceCompare (getSortByIndex)
+import Control.Monad (guard, when)
+--
+import XMonad.Actions.CycleWS (Direction1D(..), WSType(..), findWorkspace, nextScreen, prevScreen)
 import XMonad.Actions.GridSelect
 import XMonad.Actions.MouseResize
 import XMonad.Actions.Promote
@@ -21,11 +26,10 @@ import XMonad.Actions.SpawnOn
 
     -- Data
 import Data.Char (isSpace, toUpper)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Monoid
-import Data.Maybe (isJust)
 import Data.Tree
-import Data.List (isInfixOf)
+import Data.List (find, isInfixOf, isPrefixOf)
 import qualified Data.Map as M
 
     -- Hooks
@@ -71,10 +75,10 @@ import XMonad.Util.NamedActions as NamedActions
 import XMonad.Util.NamedScratchpad
 import XMonad.Util.Run (runProcessWithInput, safeSpawn, spawnPipe)
 import XMonad.Util.SpawnOnce
-import XMonad.Util.Cursor
 
+import XMonad.Util.Cursor
 -- Battery periodic check (TEST)
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO, threadDelay)
 --import Control.Monad (forever, when, void)
 -- Right handed master pane test
 import XMonad.Layout.Reflect
@@ -112,7 +116,7 @@ myTerminal :: String
 myTerminal = "alacritty"
 
 myBrowser :: String
-myBrowser = "zen"
+myBrowser = "zen-browser"
 
 myEditor :: String
 myEditor = myTerminal ++ " -e vim "
@@ -140,34 +144,30 @@ myStartupHook = do
     safeSpawn "killall" ["trayer"]
     safeSpawn "killall" ["picom"]
     safeSpawn "killall" ["volctl"]
-    safeSpawn "killall" ["xsettingsd"]
 
+    safeSpawn "killall" ["xsettingsd"]
+    liftIO $ threadDelay (2 * 1000000)
 
     safeSpawn "trayer" ["--edge", "top", "--align", "right", "--widthtype", "request", "--padding", "4", "--SetDockType", "true", "--SetPartialStrut", "false", "--expand", "true", "--transparent", "true", "--alpha", "0", "--tint", "0x282c34", "--height", "22", "--monitor", "primary"]
     safeSpawn "dunst" []
-    safeSpawn "batsignal" ["-w", "30", "-c", "20", "-d", "10", "-f", "89"]
     safeSpawn "conky" ["-c", "/home/devid/.config/conky/doom-one-01.conkyrc"]
     safeSpawn "picom" []
     safeSpawn "volctl" []
     safeSpawn "blueman-applet" []
-    spawnOnce "pgrep -x emacs || /usr/bin/emacs --daemon"
     spawnOnce "xsettingsd"
-    spawnOnce "$HOME/.local/bin/x-settings"
-    spawnOnce "numlockx"
-
-    spawnOnce "tuxedo-control-center --tray &"
+    spawnOnce "x-settings"
     spawnOnce "$HOME/.local/bin/phinger-time-daemon"
--- spawnOnce "corectrl --minimize-systray &"
+    
+    --spawnOnOnce (myWorkspaces !! 0) "emacs"                    -- Doom Emacs → workspace 1
+    spawnOnOnce (myWorkspaces !! 1) "zen-browser"  -- Zen → workspace 3
+    spawnOnOnce (myWorkspaces !! 2) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
+    spawnOnOnce (myWorkspaces !! 8) "brave"                 -- brave → workspace 8
+    --spawnOnOnce (myWorkspaces !! 6) "cryptomator"                 -- Cryptomator → workspace 7
+    
+    spawn "$HOME/.local/bin/x-settings && xset s off -dpms"
+    spawnOnce "numlockx"
+    spawnOnce "xset -q | grep -q 'Caps Lock:[[:space:]]*on' && xdotool key Caps_Lock"
 
-    -- Boot-only apps on specific workspaces (never re-launched on xmonad --restart)
-    spawnOnOnce (myWorkspaces !! 0) "emacs"                    -- Doom Emacs → workspace 1
-    spawnOnOnce (myWorkspaces !! 2) "zen"  -- Zen → workspace 3
-    spawnOnOnce (myWorkspaces !! 3) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
-    spawnOnOnce (myWorkspaces !! 7) "freetube"                 -- FreeTube → workspace 8
-    spawnOnOnce (myWorkspaces !! 6) "cryptomator"                 -- Cryptomator → workspace 7
-    
-    spawnOnce "sleep 2 && until xdotool search --onlyvisible --class zen-browser windowactivate --sync key --clearmodifiers shift+alt+u 2>/dev/null; do sleep 0.8; done"
-    
 
 
 myNavigation :: TwoD a (Maybe a)
@@ -427,9 +427,7 @@ myLayoutHook = avoidStruts
 myWorkspaces = [" 1 ", " 2 ", " 3 ", " 4 ", " 5 ", " 6 ", " 7 ", " 8 ", " 9 "]
 myWorkspaceIndices = M.fromList $ zipWith (,) myWorkspaces [1..]
 
--- clickable ws = "<action=xdotool key super+"++show i++">"++ws++"</action>"
---     where i = fromJust $ M.lookup ws myWorkspaceIndices
-clickable ws = "<action=xdotool key --clearmodifiers super+" ++ show i ++ ">" ++ ws ++ "</action>"
+clickable ws = "<action=xdotool key super+"++show i++">"++ws++"</action>"
     where i = fromJust $ M.lookup ws myWorkspaceIndices
 
 
@@ -451,33 +449,32 @@ myManageHook = composeAll
   , className =? "VirtualBox Machine" --> doFloat
   , className =? "splash"             --> doFloat
   , className =? "toolbar"            --> doFloat
+  , className =? "volctl"             --> doIgnore
   , className =? "python3"            --> doFloat
   , className =? "cs2"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
+  , fmap ("steam_app_" `isPrefixOf`) className   --> (doF (W.greedyView (myWorkspaces !! 0) . W.shift (myWorkspaces !! 0)) <+> doFloat)
   , className =? "pavucontrol"        --> doCenterFloat
   , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.798 0.25 0.2 0.45)
   , className =? "Yad"                --> doCenterFloat 
   , resource =? "crx_nngceckbapebfimnlniiiahkandclblb"   --> doFloat
 --  , className =? "zen-browser" <&&> liftM (== Just (500, 495)) minSize --> doCenterFloat
-  , className =? "zen-browser" <&&> title =? "Bitwarden — Zen Browser" --> doCenterFloat
+  --, className =? "zen-browser" <&&> title =? "Bitwarden — Zen Browser" --> doCenterFloat
 
--- Main Zen browser windows go to workspace 3, but dialogs/popups do NOT get shifted
-  , (className =? "zen-browser" <&&> fmap not isDialog) --> doShift (myWorkspaces !! 2)
   , title =? "Oracle VM VirtualBox Manager"   --> doFloat
   , title =? "Order Chain - Market Snapshots" --> doFloat
   , title =? "emacs-run-launcher" --> doFloat
   --, className =? "brave"   --> doShift ( myWorkspaces !! 1 )
   , className =? "mpv"             --> doShift ( myWorkspaces !! 7 )
   , className =? "Emacs"             --> doShift ( myWorkspaces !! 0 )
-  , className =? "Audacious"             --> doShift ( myWorkspaces !! 7 )
-  , className =? "steam"             --> doShift ( myWorkspaces !! 1 )
+  , className =? "Audacious"             --> doShift ( myWorkspaces !! 6 )
+  , className =? "steam"             --> doShift ( myWorkspaces !! 7 )
+  , className =? "Steam"             --> doShift ( myWorkspaces !! 7 )
   , className =? "FreeTube" --> doShift  ( myWorkspaces !! 7 )
   , className =? "vmware" --> doShift  ( myWorkspaces !! 4 )
   , className =? "corectrl" --> doShift  ( myWorkspaces !! 8 )
   , className =? "Piper" --> doShift  ( myWorkspaces !! 8 )
-  , className =? "transmission" --> doShift  ( myWorkspaces !! 8 )
   , className =? "tuxedo-control-center" --> doShift  ( myWorkspaces !! 8 )
   , (className =? "firefox" <&&> resource =? "Dialog") --> doFloat
-  
   , className =? "org.cryptomator.launcher.Cryptomator$MainApp" --> doShift  ( myWorkspaces !! 6 )
 
   , isFullscreen -->  doFullFloat
@@ -504,26 +501,188 @@ showKeybindings x = addName "Show Keybindings" $ io $ do
   hClose h
   return ()
 
+--------------------------------------------------------------------------------
+-- Pinned windows
+--
+-- One pin at a time. The pinned X window is referenced from the stack of every
+-- non-empty workspace (the same trick CopyWindow uses: one window, many stacks).
+--
+-- Stock xmonad gives such a window neither of the following, so they live in
+-- persistent extensible state:
+--
+--  * pinHome  : the workspace it was pinned from. Unpinning collapses the
+--               window back there, wherever you are when you unpin.
+--
+--  * pinFloat : its float state per workspace (Nothing = tiled).
+--               W.floating is ONE global `Map Window RationalRect`, so a
+--               window on several stacks is floating (at a single rect) or
+--               tiled on all of them at once. We keep one entry per workspace
+--               and swap the right one in whenever the current workspace
+--               changes. Everything else (position in the stack, focus, the
+--               active layout, NBFULL / MIRROR toggles) is already stored per
+--               workspace by xmonad, so it needs no help.
+--
+-- "Full on workspace 2 only": on 2, tile it (M-t) and toggle NBFULL
+-- (M-<Space>), or float it full-screen. Neither leaks to other workspaces.
+--------------------------------------------------------------------------------
 
--- Toggle pin: copy focused window ONLY to currently non-empty workspaces
--- (workspaces that already have ≥1 window, excluding NSP).
--- Floating state is preserved on every copy.
+data Pin = Pin
+    { pinWin   :: !Window
+    , pinHome  :: !WorkspaceId
+    , pinFloat :: !(M.Map WorkspaceId (Maybe W.RationalRect))
+    } deriving (Show, Read)
+
+data PinState = PinState
+    { psPin  :: !(Maybe Pin)
+    , psLast :: !(Maybe WorkspaceId)  -- current workspace at the previous pinLogHook
+    } deriving (Show, Read)
+
+-- Persistent, so the pin survives M-S-r / M-C-r. The copies always survived a
+-- restart (the WindowSet is serialised); the old non-persistent state did not,
+-- which left a pinned window that M-C-p ignored and M-S-p re-pinned.
+instance ExtensionClass PinState where
+    initialValue  = PinState Nothing Nothing
+    extensionType = PersistentExtension
+
+getPin :: X (Maybe Pin)
+getPin = XS.gets psPin >>= \mp -> case mp of
+    Just p -> do
+        alive <- gets (W.member (pinWin p) . windowset)
+        if alive then pure mp else Nothing <$ putPin Nothing
+    Nothing -> pure Nothing
+
+putPin :: Maybe Pin -> X ()
+putPin mp = XS.modify $ \s -> s { psPin = mp }
+
+floatOf :: Window -> WindowSet -> Maybe W.RationalRect
+floatOf w = M.lookup w . W.floating
+
+setFloat :: Window -> Maybe W.RationalRect -> WindowSet -> WindowSet
+setFloat w = maybe (W.sink w) (W.float w)
+
+-- Workspaces currently holding >= 1 window (scratchpad excluded).
+pinTargets :: WindowSet -> [WorkspaceId]
+pinTargets ss =
+    [ W.tag ws | ws <- W.workspaces ss
+               , W.tag ws /= scratchpadWorkspaceTag
+               , isJust (W.stack ws) ]
+
+-- Pure: put w on `tag` WITHOUT moving that workspace's focus. (CopyWindow's
+-- copyWindow makes the copy the focused window, so pinning used to leave
+-- keyboard focus on the pin on every workspace.)
+--   floating -> first in the stack: floats are restacked in stack order,
+--               so it stays above the other floats there;
+--   tiled    -> just below the focused window: no master-slot grab, and not
+--               at the end of the stack where tall/grid's limitWindows would
+--               hide it on a busy workspace.
+insertQuiet :: Bool -> Window -> WorkspaceId -> WindowSet -> WindowSet
+insertQuiet floating w tag = W.mapWorkspace ins
+  where
+    ins ws | W.tag ws /= tag = ws
+           | otherwise       = ws { W.stack = Just (maybe (W.Stack w [] []) place (W.stack ws)) }
+    place s@(W.Stack f up down)
+      | w `elem` W.integrate s = s
+      | floating               = W.Stack f (up ++ [w]) down
+      | otherwise              = W.Stack f up (w : down)
+
+-- Pure: remove w from every workspace except `keep` (keep's stack untouched,
+-- so the window keeps its slot there).
+dropCopiesExcept :: WorkspaceId -> Window -> WindowSet -> WindowSet
+dropCopiesExcept keep w = W.mapWorkspace $ \ws ->
+    if W.tag ws == keep then ws else ws { W.stack = W.stack ws >>= W.filter (/= w) }
+
+-- A pin for w, homed on the current workspace. Every target starts out with
+-- w's float state at pin time.
+mkPin :: Window -> WindowSet -> Pin
+mkPin w ss = Pin w (W.currentTag ss) (M.fromList [ (t, floatOf w ss) | t <- pinTargets ss ])
+
+pinPure :: Pin -> WindowSet -> WindowSet
+pinPure p ss = foldr (insertQuiet (M.member w (W.floating ss)) w) ss (M.keys (pinFloat p))
+  where w = pinWin p
+
+-- Pure: collapse the pin onto `dest` (falls back to home, then to the current
+-- workspace) and give it the float state it had on that workspace.
+unpinPure :: WorkspaceId -> Pin -> WindowSet -> WindowSet
+unpinPure dest p ss = setFloat w st . insertQuiet (isJust st) w tag . dropCopiesExcept tag w $ ss
+  where
+    w   = pinWin p
+    tag = fromMaybe (W.currentTag ss) $ find (`W.tagMember` ss) [dest, pinHome p]
+    st  = M.findWithDefault (floatOf w ss) tag (pinFloat p)
+
+-- The float state the pin should have on the current workspace, if the pin is
+-- there and xmonad currently holds something else.
+pinWanted :: Pin -> WindowSet -> Maybe (Maybe W.RationalRect)
+pinWanted p ss = do
+    guard (pinWin p `elem` W.index ss)
+    st <- M.lookup (W.currentTag ss) (pinFloat p)
+    guard (st /= floatOf (pinWin p) ss)
+    pure st
+
+applyPin :: Pin -> WindowSet -> WindowSet
+applyPin p ss = maybe ss (\st -> setFloat (pinWin p) st ss) (pinWanted p ss)
+
+-- Drop-in for `windows` on anything that changes the current workspace: the
+-- float swap is folded into the same pass, so there is a single redraw.
+pinWindows :: (WindowSet -> WindowSet) -> X ()
+pinWindows f = getPin >>= \mp -> windows (maybe id applyPin mp . f)
+
+-- Runs at the end of every `windows` call.
+--  * Same workspace as last run: record the pin's float state for it. This is
+--    what catches mouse move/resize, M-t, M-S-t, manage hooks, etc.
+--  * Workspace changed by something that bypassed pinWindows (EWMH desktop
+--    requests, M-. / M-, screen switching, gridselect, mouse focus onto the
+--    other screen): apply the stored state now. Costs one extra redraw; the
+--    nested run finds nothing left to change, so the recursion stops there.
+pinLogHook :: X ()
+pinLogHook = do
+    mp   <- getPin
+    ss   <- gets windowset
+    prev <- XS.gets psLast
+    let cur = W.currentTag ss
+    XS.modify $ \s -> s { psLast = Just cur }
+    whenJust mp $ \p -> case pinWanted p ss of
+        Just st | prev /= Just cur -> windows (setFloat (pinWin p) st)
+        _ -> when (pinWin p `elem` W.index ss) $
+                 putPin (Just p { pinFloat = M.insert cur (floatOf (pinWin p) ss) (pinFloat p) })
+
+pinWindow :: Window -> X ()
+pinWindow w = do
+    p <- gets (mkPin w . windowset)
+    putPin (Just p)
+    windows (pinPure p)
+
+-- Unpin, sending the window to `dest pin`.
+unpinTo :: (Pin -> WorkspaceId) -> X ()
+unpinTo dest = getPin >>= \mp -> whenJust mp $ \p -> do
+    putPin Nothing
+    windows (unpinPure (dest p) p)
+
 togglePin :: X ()
 togglePin = do
-    winset <- gets windowset
-    case W.peek winset of
-      Nothing -> return ()
-      Just w  -> do
-        let isCopied ws = w `elem` W.integrate' (W.stack ws)
-            allWS       = W.workspaces winset
-            nonEmptyWS  = filter (\ws -> isJust (W.stack ws) && W.tag ws /= "NSP") allWS
-            numNonEmpty = length nonEmptyWS
-            numCopies   = length $ filter isCopied nonEmptyWS
+    mp <- getPin
+    ss <- gets windowset
+    case (mp, W.peek ss) of
+      (Just p, Just w) | pinWin p == w -> unpinTo pinHome
+      (Just old, Just w) -> do                     -- hand the pin over to w
+          let unpinOld = unpinPure (pinHome old) old
+              new      = mkPin w (unpinOld ss)
+          putPin (Just new)
+          windows (pinPure new . unpinOld)
+      (Just _, Nothing)  -> unpinTo pinHome
+      (Nothing, Just w)  -> pinWindow w
+      (Nothing, Nothing) -> pure ()
 
-        if numCopies == numNonEmpty
-          then killAllOtherCopies
-          else mapM_ (windows . copy) (map W.tag nonEmptyWS)
-
+-- M-S-<n>. On the pinned window this means "unpin onto <n>", so M-S-<current>
+-- is "unpin here". Plain W.shift on it already collapses every copy onto <n>
+-- (W.delete' is global), but the pin state would survive and keep driving a
+-- window that is no longer pinned.
+shiftPinAware :: WorkspaceId -> X ()
+shiftPinAware tag = do
+    mp  <- getPin
+    foc <- gets (W.peek . windowset)
+    case mp of
+      Just p | foc == Just (pinWin p) -> unpinTo (const tag)
+      _                               -> windows (W.shift tag)
 
 myKeys :: XConfig l0 -> [((KeyMask, KeySym), NamedAction)]
 myKeys c =
@@ -543,37 +702,38 @@ myKeys c =
   , ("M-<F2>", addName "Dmenu Helpers"         $ spawn "dm-helpers")]
 
   ^++^ subKeys "Switch to workspace"
-  [ ("M-1", addName "Switch to workspace 1"    $ (windows $ W.greedyView $ myWorkspaces !! 0))
-  , ("M-2", addName "Switch to workspace 2"    $ (windows $ W.greedyView $ myWorkspaces !! 1))
-  , ("M-3", addName "Switch to workspace 3"    $ (windows $ W.greedyView $ myWorkspaces !! 2))
-  , ("M-4", addName "Switch to workspace 4"    $ (windows $ W.greedyView $ myWorkspaces !! 3))
-  , ("M-5", addName "Switch to workspace 5"    $ (windows $ W.greedyView $ myWorkspaces !! 4))
-  , ("M-6", addName "Switch to workspace 6"    $ (windows $ W.greedyView $ myWorkspaces !! 5))
-  , ("M-7", addName "Switch to workspace 7"    $ (windows $ W.greedyView $ myWorkspaces !! 6))
-  , ("M-8", addName "Switch to workspace 8"    $ (windows $ W.greedyView $ myWorkspaces !! 7))
-  , ("M-9", addName "Switch to workspace 9"    $ (windows $ W.greedyView $ myWorkspaces !! 8))]
+  [ ("M-1", addName "Switch to workspace 1"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 0))
+  , ("M-2", addName "Switch to workspace 2"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 1))
+  , ("M-3", addName "Switch to workspace 3"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 2))
+  , ("M-4", addName "Switch to workspace 4"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 3))
+  , ("M-5", addName "Switch to workspace 5"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 4))
+  , ("M-6", addName "Switch to workspace 6"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 5))
+  , ("M-7", addName "Switch to workspace 7"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 6))
+  , ("M-8", addName "Switch to workspace 8"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 7))
+  , ("M-9", addName "Switch to workspace 9"    $ (pinWindows $ W.greedyView $ myWorkspaces !! 8))]
 
   ^++^ subKeys "Cycle non-empty workspaces"
-  [ ("M-`",    addName "Next hidden non-empty workspace" $ moveTo Next hiddenNonEmptyNonNSP)
-  , ("M-S-`",  addName "Prev hidden non-empty workspace" $ moveTo Prev hiddenNonEmptyNonNSP)]
+  [ ("M-`",    addName "Next non-empty workspace" $ viewBy Next nonEmptyNonNSP)
+  , ("M-S-`",  addName "Prev non-empty workspace" $ viewBy Prev nonEmptyNonNSP)]
 
   ^++^ subKeys "Pinned / Sticky windows"
-  [ ("M-S-p", addName "Toggle pin focused window to non-empty workspaces" $ togglePin)]
+  [ ("M-S-p", addName "Pin / unpin focused window (unpin returns it home)" $ togglePin)
+  , ("M-C-p", addName "Unpin, send back to the workspace it was pinned on"  $ unpinTo pinHome)]
 
-  ^++^ subKeys "Send window to workspace"
-  [ ("M-S-1", addName "Send to workspace 1"    $ (windows $ W.shift $ myWorkspaces !! 0))
-  , ("M-S-2", addName "Send to workspace 2"    $ (windows $ W.shift $ myWorkspaces !! 1))
-  , ("M-S-3", addName "Send to workspace 3"    $ (windows $ W.shift $ myWorkspaces !! 2))
-  , ("M-S-4", addName "Send to workspace 4"    $ (windows $ W.shift $ myWorkspaces !! 3))
-  , ("M-S-5", addName "Send to workspace 5"    $ (windows $ W.shift $ myWorkspaces !! 4))
-  , ("M-S-6", addName "Send to workspace 6"    $ (windows $ W.shift $ myWorkspaces !! 5))
-  , ("M-S-7", addName "Send to workspace 7"    $ (windows $ W.shift $ myWorkspaces !! 6))
-  , ("M-S-8", addName "Send to workspace 8"    $ (windows $ W.shift $ myWorkspaces !! 7))
-  , ("M-S-9", addName "Send to workspace 9"    $ (windows $ W.shift $ myWorkspaces !! 8))]
+  ^++^ subKeys "Send window to workspace (pinned window: unpin onto it)"
+  [ ("M-S-1", addName "Send to workspace 1"    $ (shiftPinAware $ myWorkspaces !! 0))
+  , ("M-S-2", addName "Send to workspace 2"    $ (shiftPinAware $ myWorkspaces !! 1))
+  , ("M-S-3", addName "Send to workspace 3"    $ (shiftPinAware $ myWorkspaces !! 2))
+  , ("M-S-4", addName "Send to workspace 4"    $ (shiftPinAware $ myWorkspaces !! 3))
+  , ("M-S-5", addName "Send to workspace 5"    $ (shiftPinAware $ myWorkspaces !! 4))
+  , ("M-S-6", addName "Send to workspace 6"    $ (shiftPinAware $ myWorkspaces !! 5))
+  , ("M-S-7", addName "Send to workspace 7"    $ (shiftPinAware $ myWorkspaces !! 6))
+  , ("M-S-8", addName "Send to workspace 8"    $ (shiftPinAware $ myWorkspaces !! 7))
+  , ("M-S-9", addName "Send to workspace 9"    $ (shiftPinAware $ myWorkspaces !! 8))]
 
   ^++^ subKeys "Move window to WS and go there"
-  [ ("M-S-<Page_Down>", addName "Move window to next WS"   $ shiftTo Next nonNSP >> moveTo Next nonNSP)
-  , ("M-S-<Page_Up>", addName "Move window to prev WS" $ shiftTo Prev nonNSP >> moveTo Prev nonNSP)]
+  [ ("M-S-<Page_Down>", addName "Move window to next WS"   $ shiftAndView Next)
+  , ("M-S-<Page_Up>", addName "Move window to prev WS" $ shiftAndView Prev)]
 
   ^++^ subKeys "Window navigation"
   [ ("M-j", addName "Move focus to next window"                $ windows W.focusDown)
@@ -610,10 +770,9 @@ myKeys c =
   ^++^ subKeys "Favorite programs"
   [ ("M-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
   , ("M-alt-<Return>", addName "Launch terminal"   $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn (myTerminal ++ " -e fish")])
-  , ("M-b", addName "Launch web browser"       $ spawn "zen --new-window https://web.tabliss.io/")
+  , ("M-b", addName "Launch web browser"       $ spawn "zen-browser --new-window https://web.tabliss.io/")
   , ("M-S-l", addName "Bitwarden"  $ spawn  "dbus-run-session -- flatpak run com.bitwarden.desktop &")
-  --, ("M-d", addName "Launch Doom Emacs"        $ spawn "emacsclient -c -a '' --eval '(progn (+doom-dashboard/open (selected-frame)))'")
-  , ("M-d", addName "Launch Doom Emacs"        $ spawn "emacs")
+  , ("M-d", addName "Launch Doom Emacs"        $ spawn "emacsclient -c -a ''")
   , ("M-M1-h", addName "Launch htop"           $ spawn (myTerminal ++ " -e htop"))
   , ("<Print>", addName "Selection screenshot" $ spawn "maim -s | xclip -selection clipboard -t image/png")
   , ("M-C-v", addName "Primary paste"          $ spawn "xdotool click 1")
@@ -682,6 +841,12 @@ myKeys c =
   , ("C-M-7", addName "Menu of system apps"     $ spawnSelected' gsSystem)
   , ("C-M-8", addName "Menu of utilities apps"  $ spawnSelected' gsUtilities)]
 
+  ^++^ subKeys "Volume control with Function keys"
+  [ ("<F6>", addName "Toggle audio mute (all sinks)" $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-mute {} toggle")
+  , ("<F7>", addName "Lower volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} -5%")
+  , ("<F8>", addName "Raise volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} +5%")
+  ]
+  -- Multimedia Keys
   ^++^ subKeys "Multimedia keys"
   [ ("<XF86AudioPlay>", addName "mocp play"           $ spawn "mocp --play")
   , ("<XF86AudioPrev>", addName "mocp next"           $ spawn "mocp --previous")
@@ -697,26 +862,16 @@ myKeys c =
   , ("<XF86Calculator>", addName "Calculator"         $ runOrRaise "qalculate-gtk" (resource =? "qalculate-gtk"))
   , ("<XF86Eject>", addName "Eject /dev/cdrom"        $ spawn "eject /dev/cdrom")
   , ("<XF86TouchpadToggle>", addName "Toggle Touchpad"        $ spawn "$HOME/.local/bin/toggle-touchpad && $HOME/.local/bin/x-settings")
-  , ("<F1>", addName "Decrease brightness" $ spawn "~/.local/bin/brightdown")
-  , ("<F2>",   addName "Increase brightness" $ spawn "~/.local/bin/brightup")
-  , ("<F6>", addName "Toggle audio mute (all sinks)" $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-mute {} toggle")
-  --, ("<F6>", addName "Toggle audio mute"   $ spawn "dinitctl start --pin pipewire && dinitctl start --pin pipewire-pulse && dinitctl start --pin wireplumber && amixer set Master toggle")
-  , ("<F7>", addName "Lower volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} -5%")
-  , ("<F8>", addName "Raise volume (all sinks)"     $ spawn "pactl list short sinks | awk '{print $1}' | xargs -I {} pactl set-sink-volume {} +5%")
-  , ("<F11>", addName "Toggle touchpad"            $ spawn "$HOME/.local/bin/toggle-touchpad && $HOME/.local/bin/x-settings")
+
   ]
   -- The following lines are needed for named scratchpads.
     where nonNSP          = WSIs (return (\ws -> W.tag ws /= "NSP"))
           nonEmptyNonNSP  = WSIs (return (\ws -> isJust (W.stack ws) && W.tag ws /= "NSP"))
-          -- hiddenNonEmptyNonNSP: Only non-empty workspaces that are NOT currently
-          -- visible on *any* monitor (current screen + all other screens).
-          -- This makes M-` / M-S-` skip workspaces already shown on another monitor.
-          hiddenNonEmptyNonNSP = WSIs $ do
-            winset <- gets windowset
-            let visibleTags = map (W.tag . W.workspace) (W.current winset : W.visible winset)
-            return $ \ws -> isJust (W.stack ws)
-                         && W.tag ws /= "NSP"
-                         && W.tag ws `notElem` visibleTags
+          -- moveTo / shiftTo bodies, routed through the pin-aware versions
+          viewBy dir t     = findWorkspace getSortByIndex dir t 1 >>= pinWindows . W.greedyView
+          shiftAndView dir = do t <- findWorkspace getSortByIndex dir nonNSP 1
+                                shiftPinAware t
+                                pinWindows (W.greedyView t)
 
 main :: IO ()
 main = do
@@ -731,13 +886,16 @@ main = do
     , handleEventHook    = windowedFullscreenFixEventHook <> swallowEventHook (className =? "Alacritty"  <||> className =? "st-256color" <||> className =? "XTerm") (return True) <> trayerPaddingXmobarEventHook
     , modMask            = myModMask
     , terminal           = myTerminal
-    , startupHook = myStartupHook <> setDefaultCursor xC_left_ptr
+    , startupHook        = myStartupHook
     , layoutHook         = showWName' myShowWNameTheme $ myLayoutHook
     , workspaces         = myWorkspaces
     , borderWidth        = myBorderWidth
     , normalBorderColor  = myNormColor
     , focusedBorderColor = myFocusColor
     , logHook = do
+        -- per-workspace float state of the pinned window (must run on every refresh)
+        pinLogHook
+
         -- your status bar logging
         dynamicLogWithPP $  filterOutWsPP [scratchpadWorkspaceTag] $ xmobarPP
           { ppOutput = \x -> hPutStrLn xmproc0 x
