@@ -33,7 +33,8 @@ declare -A NAME=([win]=win11-dfir [sift]=sift [vol2]=vol2)
 declare -A LAUNCH=([win]=win11-dfir.sh [sift]=sift-dfir.sh [vol2]=vol2-dfir.sh)
 declare -A PORT=([win]=2222 [sift]=2223 [vol2]=2224)
 declare -A USERN=([win]=analyst [sift]=sansforensics [vol2]=vagrant)
-declare -A RAM_G=([win]=4 [sift]=4 [vol2]=4)   # must match RAM= in the launchers
+_w=${WIN_RAM:-4G}
+declare -A RAM_G=([win]=${_w%G} [sift]=4 [vol2]=4)   # must match RAM= in the launchers (win: WIN_RAM)
 declare -A DISK=([win]=win11.qcow2 [sift]=sift.qcow2 [vol2]=vol2.qcow2)
 ALL=(win sift vol2)
 

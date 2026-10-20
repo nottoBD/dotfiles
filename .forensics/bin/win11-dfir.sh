@@ -21,7 +21,7 @@ VIRTIO_ISO="$ISO/virtio-win.iso"
 UNATTEND_ISO="$VM/unattend.iso"
 SSH_FWD="hostfwd=tcp:127.0.0.1:2222-:22"
 
-RAM=4G          # 14 GiB host shared with SIFT (4G): keep the pair under ~9 GiB
+RAM=${WIN_RAM:-4G}   # per-host override: WIN_RAM=6G (14 GiB laptop: keep win + sift under ~9 GiB)
 CPUS=6
 
 mode="${1:-run}"
