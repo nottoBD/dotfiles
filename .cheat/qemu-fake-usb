@@ -1,0 +1,8 @@
+```
+mkdir -p ~/vm/images/fakeusb
+truncate -s 512M ~/vm/images/fakeusb/fakeusb01.raw
+set DEV (sudo losetup -fP --show ~/vm/images/fakeusb/fakeusb01.raw); echo $DEV
+echo 'start=2048, type=c' | sudo sfdisk $DEV
+sudo mkfs.vfat -F 32 -n FAKEUSB "$DEV"p1
+lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,RO $DEV
+```

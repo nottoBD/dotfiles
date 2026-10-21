@@ -25,7 +25,7 @@ import qualified XMonad.Actions.Search as S
 import XMonad.Actions.SpawnOn
 
     -- Data
-import Data.Char (isSpace, toUpper)
+import Data.Char (isSpace, toLower, toUpper)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Monoid
 import Data.Tree
@@ -229,6 +229,11 @@ runSelectedAction' conf actions = do
     case selectedActionM of
         Just selectedAction -> selectedAction
         Nothing -> return ()
+
+-- QEMU guests and every window they spawn (GTK/SDL display, detached tabs, consoles, viewers)
+isQemuVM :: Query Bool
+isQemuVM = fmap (\c -> any (`isPrefixOf` map toLower c)
+                       ["qemu", "remote-viewer", "virt-viewer", "spicy"]) className
 
 gsCategories =
   [ ("Games",      "xdotool key super+alt+1")
@@ -452,6 +457,7 @@ myManageHook = composeAll
   , className =? "volctl"             --> doIgnore
   , className =? "python3"            --> doFloat
   , className =? "cs2"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
+  , isQemuVM --> doF (W.greedyView (myWorkspaces !! 3) . W.shift (myWorkspaces !! 3))
   , fmap ("steam_app_" `isPrefixOf`) className   --> (doF (W.greedyView (myWorkspaces !! 0) . W.shift (myWorkspaces !! 0)) <+> doFloat)
   , className =? "pavucontrol"        --> doCenterFloat
   , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.798 0.25 0.2 0.45)
