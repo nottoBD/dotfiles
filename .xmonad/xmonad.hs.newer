@@ -159,10 +159,12 @@ myStartupHook = do
     spawnOnce "$HOME/.local/bin/phinger-time-daemon"
     
     --spawnOnOnce (myWorkspaces !! 0) "emacs"                    -- Doom Emacs → workspace 1
-    spawnOnOnce (myWorkspaces !! 1) "zen-browser"  -- Zen → workspace 3
-    spawnOnOnce (myWorkspaces !! 2) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
-    spawnOnOnce (myWorkspaces !! 8) "brave"                 -- brave → workspace 8
-    --spawnOnOnce (myWorkspaces !! 6) "cryptomator"                 -- Cryptomator → workspace 7
+    spawnOnOnce (myWorkspaces !! 1) "zen-browser --space Social"  -- Zen → workspace 2
+    spawnOnOnce (myWorkspaces !! 1) "zen-browser --space Cyber"  -- Zen → workspace 2
+    spawnOnOnce (myWorkspaces !! 2) "zen-browser --space Study 'file:///home/devid/.local/share/Cryptomator/mnt/synthesis/digital_forensics_rma_ma2/01-disks-exercises.pdf'"  -- Zen → workspace 3
+    spawnOnOnce (myWorkspaces !! 3) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
+    spawnOnOnce (myWorkspaces !! 8) "brave --kiosk https://youtube.com"                 -- brave → workspace 9
+    spawnOnOnce (myWorkspaces !! 6) "cryptomator"                 -- Cryptomator → workspace 7
     
     spawn "$HOME/.local/bin/x-settings && xset s off -dpms"
     spawnOnce "numlockx"
@@ -457,7 +459,7 @@ myManageHook = composeAll
   , className =? "volctl"             --> doIgnore
   , className =? "python3"            --> doFloat
   , className =? "cs2"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
-  , isQemuVM --> doF (W.greedyView (myWorkspaces !! 3) . W.shift (myWorkspaces !! 3))
+  , isQemuVM --> doF (W.greedyView (myWorkspaces !! 5) . W.shift (myWorkspaces !! 5))
   , fmap ("steam_app_" `isPrefixOf`) className   --> (doF (W.greedyView (myWorkspaces !! 0) . W.shift (myWorkspaces !! 0)) <+> doFloat)
   , className =? "pavucontrol"        --> doCenterFloat
   , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.798 0.25 0.2 0.45)
