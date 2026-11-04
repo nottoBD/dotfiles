@@ -11,7 +11,7 @@ import qualified XMonad.StackSet as W
 import XMonad.Actions.CopyWindow (kill1)
 import qualified XMonad.Util.ExtensibleState as XS
 import XMonad.Util.WorkspaceCompare (getSortByIndex)
-import Control.Monad (guard, when)
+import Control.Monad (guard, when, unless)
 --
 import XMonad.Actions.CycleWS (Direction1D(..), WSType(..), findWorkspace, nextScreen, prevScreen)
 import XMonad.Actions.GridSelect
@@ -25,18 +25,28 @@ import qualified XMonad.Actions.Search as S
 import XMonad.Actions.SpawnOn
 
     -- Data
-import Data.Char (isSpace, toUpper)
-import Data.Maybe (fromJust, fromMaybe, isJust)
+import Data.Char (isSpace, toLower, toUpper)
+import Data.Maybe (fromJust, fromMaybe, isJust, isNothing, listToMaybe)
 import Data.Monoid
 import Data.Tree
-import Data.List (find, isInfixOf, isPrefixOf)
+import Data.List (find, intercalate, isInfixOf, isPrefixOf)
 import qualified Data.Map as M
+import Data.Time.Clock.POSIX (getPOSIXTime)  -- Zen startup windows
 
     -- Hooks
 import XMonad.Hooks.DynamicLog (dynamicLogWithPP, wrap, xmobarPP, xmobarColor, shorten, PP(..))
 import XMonad.Hooks.EwmhDesktops  -- for some fullscreen events, also for xcomposite in obs.
-import XMonad.Hooks.ManageDocks (avoidStruts, docks, manageDocks, ToggleStruts(..))
-import XMonad.Hooks.ManageHelpers (isDialog, isFullscreen, doFullFloat, doCenterFloat, doRectFloat)
+import XMonad.Hooks.ManageDocks (avoidStruts, avoidStrutsOn, docks, manageDocks, ToggleStruts(..))
+import XMonad.Hooks.ManageHelpers (isDialog, isFullscreen, doFullFloat, doCenterFloat, doRectFloat, doFocus, pid)
+import Control.Exception (SomeException, try)      -- isSteamGame: /proc read may fail
+import qualified Data.ByteString.Char8 as B        -- isSteamGame: strict reads of /proc/<pid>/{environ,cmdline}
+import Foreign (Ptr, FunPtr, castFunPtr, nullPtr, alloca, allocaBytes, peek, poke, pokeByteOff)
+import Foreign.C.Types (CInt(..), CLong(..), CUInt(..), CULong(..))
+import Graphics.X11.Xlib.Types (Display(..))      -- raw Display* for libXRes
+import System.IO.Unsafe (unsafePerformIO)
+import System.Posix.DynamicLinker (dlopen, dlsym, RTLDFlags(..))
+import System.Posix.Types (ProcessID)
+import XMonad.Util.Process (getPPIDChain)
 import XMonad.Hooks.ServerMode
 import XMonad.Hooks.SetWMName
 import XMonad.Hooks.StatusBar
@@ -57,6 +67,7 @@ import XMonad.Layout.LimitWindows (limitWindows, increaseLimit, decreaseLimit)
 import XMonad.Layout.MultiToggle (mkToggle, single, EOT(EOT), (??))
 import XMonad.Layout.MultiToggle.Instances (StdTransformers(NBFULL, MIRROR, NOBORDERS))
 import XMonad.Layout.NoBorders
+import XMonad.Layout.PerWorkspace (onWorkspace)
 import XMonad.Layout.Renamed
 import XMonad.Layout.ShowWName
 import XMonad.Layout.Simplest
@@ -75,6 +86,7 @@ import XMonad.Util.NamedActions as NamedActions
 import XMonad.Util.NamedScratchpad
 import XMonad.Util.Run (runProcessWithInput, safeSpawn, spawnPipe)
 import XMonad.Util.SpawnOnce
+import XMonad.Util.WindowProperties (getProp32s)   -- Zen startup windows: _ZEN_SLOT_STAGE
 
 import XMonad.Util.Cursor
 -- Battery periodic check (TEST)
@@ -138,6 +150,11 @@ windowCount = gets $ Just . show . length . W.integrate' . W.stack . W.workspace
 
 
 myStartupHook = do
+    -- First, before the 2 s pause: the synthesis vault auto-unlocks when
+    -- Cryptomator starts (vault option + password in the keyring), and the
+    -- Study slot's PDF needs it. JVM start + key derivation take a few seconds.
+    spawnOnOnce (myWorkspaces !! 6) "cryptomator"                 -- Cryptomator → workspace 7
+
     -- Kill any previous instances
     safeSpawn "killall" ["conky"]
     safeSpawn "killall" ["blueman-applet"]
@@ -159,10 +176,10 @@ myStartupHook = do
     spawnOnce "$HOME/.local/bin/phinger-time-daemon"
     
     --spawnOnOnce (myWorkspaces !! 0) "emacs"                    -- Doom Emacs → workspace 1
-    spawnOnOnce (myWorkspaces !! 1) "zen-browser"  -- Zen → workspace 3
-    spawnOnOnce (myWorkspaces !! 2) (myTerminal ++ " -e fish") -- Alacritty → workspace 4
-    spawnOnOnce (myWorkspaces !! 8) "brave"                 -- brave → workspace 8
-    --spawnOnOnce (myWorkspaces !! 6) "cryptomator"                 -- Cryptomator → workspace 7
+    zenBootStart                                                  -- Zen: Social → 2, Cyber → 3, Study → 5 (see "Zen startup windows")
+    spawnOnOnce (myWorkspaces !! 2) (myTerminal ++ " --class term3 -e fish")
+    spawnOnOnce (myWorkspaces !! 3) (myTerminal ++ " --class term4 -e fish")
+    spawnOnOnce (myWorkspaces !! 8) "brave --kiosk https://youtube.com"                 -- brave → workspace 9
     
     spawn "$HOME/.local/bin/x-settings && xset s off -dpms"
     spawnOnce "numlockx"
@@ -229,6 +246,105 @@ runSelectedAction' conf actions = do
     case selectedActionM of
         Just selectedAction -> selectedAction
         Nothing -> return ()
+
+-- QEMU guests and every window they spawn (GTK/SDL display, detached tabs, consoles, viewers)
+isQemuVM :: Query Bool
+isQemuVM = fmap (\c -> any (`isPrefixOf` map toLower c)
+                       ["qemu", "remote-viewer", "virt-viewer", "spicy"]) className
+
+--------------------------------------------------------------------------------
+-- Steam games: every window whose process the Steam client launched, native
+-- or Proton, whatever its WM_CLASS (steam_app_<id>, cs2, Godot_Engine, ...).
+--
+-- Steam starts every game as `reaper SteamLaunch AppId=<id> -- <game>`.
+-- reaper stays the parent and is a child subreaper, so even a game that
+-- double-forks stays below it, and SteamGameId=<id> sits in the environment
+-- of every descendant. Steam's own windows (steamwebhelper) have neither.
+--
+-- Which process owns the window: _NET_WM_PID is set by the client itself,
+-- and many engines (Godot 3, plain Xlib/Xt, some SDL builds) never set it,
+-- and a client in its own PID namespace sets a PID that is wrong on the host.
+-- So ask the X server first: the X-Resource extension (XResQueryClientIds,
+-- XRes >= 1.2) returns the PID the server got from the client's socket
+-- credentials. libXRes is opened with dlopen at first use, so the build
+-- needs no extra linker flags. No libXRes -> falls back to _NET_WM_PID.
+--
+-- Side effect: a NEW process a game starts (e.g. a browser opened from a link
+-- when none is running) is below reaper too and lands on 1 as well.
+--------------------------------------------------------------------------------
+
+isSteamGame :: Query Bool
+isSteamGame = fmap ("steam_app_" `isPrefixOf`) className
+         <||> (windowPid >>= maybe (pure False) (liftIO . launchedBySteam))
+
+launchedBySteam :: ProcessID -> IO Bool
+launchedBySteam p = (||) <$> hasSteamEnv p <*> underReaper
+  where
+    underReaper = do
+        chain <- either (const []) id <$> tryAny (getPPIDChain p)
+        or <$> mapM isSteamReaper chain
+
+-- SteamGameId=<id> in the process's initial environment.
+hasSteamEnv :: ProcessID -> IO Bool
+hasSteamEnv p = any (B.pack "SteamGameId=" `B.isPrefixOf`) . B.split '\0'
+            <$> readProc p "environ"
+
+-- argv of Steam's game launcher: reaper SteamLaunch AppId=<id> -- ...
+isSteamReaper :: ProcessID -> IO Bool
+isSteamReaper p = do
+    argv <- B.split '\0' <$> readProc p "cmdline"
+    pure $ case argv of
+        exe : rest -> B.pack "reaper" `B.isSuffixOf` exe && B.pack "SteamLaunch" `elem` rest
+        []         -> False
+
+-- /proc/<pid>/<file>; empty if the process is gone or not ours.
+readProc :: ProcessID -> FilePath -> IO B.ByteString
+readProc p f = either (const B.empty) id <$> tryAny (B.readFile ("/proc/" ++ show p ++ "/" ++ f))
+
+tryAny :: IO a -> IO (Either SomeException a)
+tryAny = try
+
+-- PID of the client owning the window: X server's view first, then _NET_WM_PID.
+windowPid :: Query (Maybe ProcessID)
+windowPid = do
+    w    <- ask
+    Display dpy <- liftX (asks display)
+    fromServer  <- liftIO (xresClientPid dpy w)
+    maybe pid (pure . Just) fromServer
+
+type XResQueryClientIds = Ptr Display -> CLong -> Ptr () -> Ptr CLong -> Ptr (Ptr ()) -> IO CInt
+type XResGetClientPid   = Ptr () -> IO CInt
+type XResClientIdsFree  = CLong -> Ptr () -> IO ()
+foreign import ccall "dynamic" mkXResQueryClientIds :: FunPtr XResQueryClientIds -> XResQueryClientIds
+foreign import ccall "dynamic" mkXResGetClientPid   :: FunPtr XResGetClientPid   -> XResGetClientPid
+foreign import ccall "dynamic" mkXResClientIdsFree  :: FunPtr XResClientIdsFree  -> XResClientIdsFree
+
+libXRes :: Maybe (XResQueryClientIds, XResGetClientPid, XResClientIdsFree)
+libXRes = unsafePerformIO $ either (const Nothing) Just <$> tryAny load
+  where
+    load = do
+        h <- dlopen "libXRes.so.1" [RTLD_NOW, RTLD_LOCAL]
+        (,,) <$> (mkXResQueryClientIds . castFunPtr <$> dlsym h "XResQueryClientIds")
+             <*> (mkXResGetClientPid   . castFunPtr <$> dlsym h "XResGetClientPid")
+             <*> (mkXResClientIdsFree  . castFunPtr <$> dlsym h "XResClientIdsDestroy")
+{-# NOINLINE libXRes #-}
+
+xresClientPid :: Ptr Display -> Window -> IO (Maybe ProcessID)
+xresClientPid dpy w = case libXRes of
+    Nothing -> pure Nothing
+    Just (query, getPid, free) ->
+        allocaBytes 16 $ \spec -> alloca $ \nIds -> alloca $ \ids -> do
+            -- XResClientIdSpec { XID client; unsigned int mask; }
+            pokeByteOff spec 0 (fromIntegral w :: CULong)
+            pokeByteOff spec 8 (2 :: CUInt)          -- XRES_CLIENT_ID_PID_MASK
+            poke nIds 0
+            poke ids nullPtr                         -- untouched if the server lacks XRes
+            status <- query dpy 1 spec nIds ids
+            n <- peek nIds
+            v <- peek ids
+            p <- if status == 0 && n > 0 && v /= nullPtr then getPid v else pure (-1)
+            when (v /= nullPtr) $ free n v
+            pure $ if p > 0 then Just (fromIntegral p) else Nothing
 
 gsCategories =
   [ ("Games",      "xdotool key super+alt+1")
@@ -373,18 +489,21 @@ monocle  = renamed [Replace "monocle"]
            $ windowNavigation
            $ addTabs shrinkText myTabTheme
            $ subLayout [] (smartBorders Simplest)
-           $ avoidStruts 
-           $ Full
+           $ Full                                   -- struts handled once, in myLayoutHook
 floats   = renamed [Replace "floats"]
            $ smartBorders
            $ simplestFloat
-grid     = renamed [Replace "grid"]
+grid      = gridWith 8
+gridFlush = gridWith 0                      -- workspace 9: no gaps between windows or at the screen edge
+-- Lambda (pattern binding), not `gridWith g = ...`: like the bindings above it
+-- gets no generalised type, so its layout type is fixed by its uses (Window).
+gridWith = \g -> renamed [Replace "grid"]
            $ limitWindows 9
            $ smartBorders
            $ windowNavigation
            $ addTabs shrinkText myTabTheme
            $ subLayout [] (smartBorders Simplest)
-           $ mySpacing 8
+           $ mySpacing g                    -- 0 still leaves C-M-j/k etc. working
            $ mkToggle (single MIRROR)
            $ Grid (16/10)
 tabs     = renamed [Replace "tabs"]
@@ -411,17 +530,37 @@ myShowWNameTheme = def
   }
 
 -- The layout hook
-myLayoutHook = avoidStruts
-               $ mouseResize
-               $ windowArrange
-               $ T.toggleLayouts (noBorders Full)
-               $ mkToggle (NBFULL ?? NOBORDERS ?? EOT) myDefaultLayout
+-- Workspace 1 starts in monocle (Full) with struts off, i.e. the state M-S-b
+-- gives. Struts and layout state are per workspace, so M-S-b on 1 brings the
+-- bar back there only, and the other workspaces are unchanged.
+-- Workspace 9 starts in a gapless grid with the bar shown (it takes the
+-- avoidStruts branch, like 2-8).
+myLayoutHook = onWorkspace ws1 (avoidStrutsOn [] layouts)
+             $ avoidStruts layouts
   where
+    ws1     = myWorkspaces !! 0
+    ws9     = myWorkspaces !! 8
+    layouts = mouseResize
+            $ windowArrange
+            $ T.toggleLayouts (noBorders Full)
+            $ mkToggle (NBFULL ?? NOBORDERS ?? EOT)
+            $ onWorkspace ws1 ws1Layout
+            $ onWorkspace ws9 ws9Layout myDefaultLayout
     myDefaultLayout = withBorder myBorderWidth tall
-                                           ||| noBorders monocle
-                                           ||| floats
-                                           ||| noBorders tabs
-                                           ||| grid
+                  ||| noBorders monocle
+                  ||| floats
+                  ||| noBorders tabs
+                  ||| grid
+    ws1Layout       = noBorders monocle
+                  ||| withBorder myBorderWidth tall
+                  ||| floats
+                  ||| noBorders tabs
+                  ||| grid
+    ws9Layout       = gridFlush
+                  ||| withBorder myBorderWidth tall
+                  ||| noBorders monocle
+                  ||| floats
+                  ||| noBorders tabs
 
 
 myWorkspaces = [" 1 ", " 2 ", " 3 ", " 4 ", " 5 ", " 6 ", " 7 ", " 8 ", " 9 "]
@@ -452,7 +591,8 @@ myManageHook = composeAll
   , className =? "volctl"             --> doIgnore
   , className =? "python3"            --> doFloat
   , className =? "cs2"                --> (doShift (myWorkspaces !! 0) <+> doFloat)
-  , fmap ("steam_app_" `isPrefixOf`) className   --> (doF (W.greedyView (myWorkspaces !! 0) . W.shift (myWorkspaces !! 0)) <+> doFloat)
+  , isQemuVM --> doF (W.greedyView (myWorkspaces !! 5) . W.shift (myWorkspaces !! 5))
+  , isSteamGame                       --> doFloat   -- workspace placement: see manageHook in main
   , className =? "pavucontrol"        --> doCenterFloat
   , (className =? "Yad" <&&> fmap ("Cheatsheet" `isInfixOf`) title) --> doRectFloat (W.RationalRect 0.798 0.25 0.2 0.45)
   , className =? "Yad"                --> doCenterFloat 
@@ -479,6 +619,338 @@ myManageHook = composeAll
 
   , isFullscreen -->  doFullFloat
   ] <+> namedScratchpadManageHook myScratchPads
+
+--------------------------------------------------------------------------------
+-- Zen startup windows: Social on 2, Cyber on 3, Study (+ PDF) on 5
+--
+-- Why spawnOnOnce can't do this. Zen is a single process:
+--  * three launches in one startupHook tick race for the profile lock; the
+--    losers find it held but the winner not yet listening for remote commands
+--    -> "Zen is already running".
+--  * a launch against a running instance only hands its arguments over and
+--    exits, so every window carries the first process's _NET_WM_PID and
+--    manageSpawn can place at most one of them.
+--  * `--space` (Zen >= 1.23.3b) on a running instance opens no window; it
+--    switches the space of Zen's *top* window (BrowserWindowTracker order:
+--    the most recently activated window, or a newer one that was opened since).
+--  * A URL handed to a running Zen is an *external* link: Space Routing sees
+--    it (gZenSpaceRoutingManager.getWindowForExternalUri). If the space set for
+--    external links (or a rule) is another one, Zen opens the URL in the most
+--    recently used window showing that space, in that space, and pulls you
+--    there. That's how the Study PDF ended up in a Cyber window on 2. So the
+--    file is not given to zen-browser: it is typed into the Study window's own
+--    URL bar, which is an internal navigation (routing rules only, no
+--    external-link default).
+--  * Zen's session restore moves every restored window back to the desktop it
+--    was on at logout: SessionStore -> nsWindow::MoveToWorkspace ->
+--    _NET_WM_DESKTOP client message to the root window (Firefox >= 75, X11).
+--    ewmh grants that for any window it manages, i.e. *after* the manage hook
+--    has placed it. Firefox only skips it by itself on GNOME with dynamic
+--    workspaces, i3 and bspwm. SessionStore restores the window that had
+--    focus at logout first, so it maps first and takes the Social slot, then
+--    goes back to its old desktop: 5 if you logged out from Study. Every
+--    other window gets the wrong slot the same way.
+--
+-- What happens instead, once per login:
+--  1. zenBootStart  launches ~/.local/bin/zen-session, which starts Zen and
+--                   opens windows until every slot below has one. Windows Zen's
+--                   session restore brings back count too, so they don't pile
+--                   up from one login to the next.
+--  2. zenBootManage gives each new Zen window the next free slot's workspace.
+--                   Surplus windows are parked on workspace 2, under the Social
+--                   window (2 keeps its focus on Social). While booting:
+--                   - zenHoldDesktopRequests holds Zen's _NET_WM_DESKTOP
+--                     requests, so ewmh doesn't move the windows; zenClaim
+--                     reads each as "this window was on workspace N at
+--                     logout" and gives it N's slot (first claim wins), so
+--                     last session's windows return with their spaces and
+--                     tabs, and the Study PDF isn't opened a second time;
+--                   - Zen's activation requests are ignored (zenActivateHook):
+--                     new windows and --space call focus(), and ewmh's default
+--                     doFocus would drag you across workspaces and take the
+--                     keyboard, e.g. while you type the vault password on 7.
+--  3. zenBootLog    applies a slot when focus *moves to* its window. That
+--                   FocusIn is what makes it Zen's top window; merely keeping
+--                   focus does not, so the refresh that manages a newly opened
+--                   Zen window (now the top one) must not fire for the window
+--                   that still has focus. The command runs 0.3 s later, only if
+--                   the window still has focus, and records how far it got on
+--                   the window (_ZEN_SLOT_STAGE: 1 = space, 2 = URL opened). A
+--                   slot that falls short is retried at the next focus, so
+--                   flicking through 2, 3, 5 neither sends a space to the wrong
+--                   window nor loses it. A URL waits until its file exists
+--                   (vault unlocked; Cryptomator is started first in the
+--                   startupHook so an auto-unlocking vault is up early), then
+--                   goes through the focused window's URL bar after the space
+--                   switch: switch to the tab if it's already open (restored),
+--                   else open it in a new tab. Never a second copy.
+--                   Still open: a Zen window *opened* within those 0.3 s becomes
+--                   top while the focused one keeps X focus. Only possible while
+--                   you sit on a slot's workspace during the boot burst.
+--
+-- Unfilled slot count is published as the root property _ZEN_SLOTS for
+-- zen-session. Log: ~/.local/state/zen-session.log (held desktop requests too).
+--------------------------------------------------------------------------------
+
+data ZenSlot = ZenSlot
+    { zsWs        :: !WorkspaceId
+    , zsSpace     :: !String            -- Zen space name (no single quotes)
+    , zsUrl       :: !(Maybe FilePath)  -- local file to open in that space once it exists
+    , zsEssential :: !(Maybe Int)       -- then select Essential n: Alt+n, Essentials are indexed first
+    } deriving (Show, Read)
+
+zenSlots :: [ZenSlot]
+zenSlots =
+    [ ZenSlot (myWorkspaces !! 1) "Social" Nothing Nothing
+    , ZenSlot (myWorkspaces !! 2) "Cyber"  Nothing (Just 1)
+    , ZenSlot (myWorkspaces !! 4) "Study"
+        (Just "/home/devid/.local/share/Cryptomator/mnt/synthesis/discreet_math_ulb_bs3/MATHF307_synthese.pdf")
+        Nothing
+    ]
+
+data ZenBoot = ZenBoot
+    { zbStarted :: !Bool
+    , zbFree    :: ![ZenSlot]                     -- slots still waiting for a window
+    , zbPending :: ![(Window, ZenSlot, Integer)]  -- placed; epoch ms until which its last command
+                                                  --   may still be running (0 = none sent)
+    , zbUntil   :: !Integer                       -- epoch s: end of the boot hold (placement,
+                                                  --   activation, desktop requests)
+    , zbFocus   :: !(Maybe Window)                -- focused window at the previous zenBootLog
+    , zbSettled :: ![Window]                      -- got their slot by their own claim (zenClaim)
+    } deriving (Show, Read)
+
+-- Persistent: a mid-boot M-C-r keeps the slots and pending switches. A state
+-- saved with another layout of this record doesn't parse, and falls back to
+-- initialValue: zenBootStart then finds Zen running and leaves it alone.
+instance ExtensionClass ZenBoot where
+    initialValue  = ZenBoot False [] [] 0 Nothing []
+    extensionType = PersistentExtension
+
+-- Zen's main browser windows only (PiP, extension popups and dialogs carry
+-- other roles). Check with: xprop WM_CLASS WM_WINDOW_ROLE
+zenWindow :: Query Bool
+zenWindow = (className =? "zen" <||> className =? "zen-browser")
+       <&&> stringProperty "WM_WINDOW_ROLE" =? "browser"
+
+epoch :: X Integer
+epoch = floor <$> io getPOSIXTime
+
+epochMs :: X Integer
+epochMs = floor . (* 1000) <$> io getPOSIXTime
+
+zenBooting :: X Bool
+zenBooting = (<) <$> epoch <*> XS.gets zbUntil
+
+zenLog :: String -> X ()
+zenLog msg = do
+    home <- io getHomeDirectory
+    catchIO $ appendFile (home ++ "/.local/state/zen-session.log") ("xmonad: " ++ msg ++ "\n")
+
+publishZenSlots :: X ()
+publishZenSlots = do
+    n <- XS.gets (length . zbFree)
+    withDisplay $ \d -> do
+        a <- getAtom "_ZEN_SLOTS"
+        r <- asks theRoot
+        io $ changeProperty32 d r a cARDINAL propModeReplace [fromIntegral n]
+
+-- startupHook. Runs on every restart; acts once per X session.
+zenBootStart :: X ()
+zenBootStart = do
+    started <- XS.gets zbStarted
+    unless started $ do
+        wins    <- gets (W.allWindows . windowset)
+        running <- or <$> mapM (runQuery zenWindow) wins
+        now     <- epoch
+        -- Zen already up (e.g. the M-C-r that installs this): leave it alone.
+        XS.put $ if running then ZenBoot True [] [] 0 Nothing []
+                            else ZenBoot True zenSlots [] (now + 180) Nothing []
+        publishZenSlots
+        unless running $ spawn "$HOME/.local/bin/zen-session"
+
+zenBootManage :: ManageHook
+zenBootManage = zenWindow --> do
+    booting <- liftX zenBooting
+    if not booting then idHook else do
+        w  <- ask
+        st <- liftX XS.get
+        case zbFree st of
+            s : rest -> do
+                now <- liftX epoch
+                liftX $ do
+                    XS.put st { zbFree    = rest
+                              , zbPending = (w, s, 0) : zbPending st
+                              -- last slot filled: end the hold shortly after
+                              , zbUntil   = if null rest then min (zbUntil st) (now + 10)
+                                                         else zbUntil st }
+                    publishZenSlots
+                doShift (zsWs s)
+            [] -> ask >>= doF . zenPark       -- surplus (restored) window
+
+-- Surplus Zen windows go to 2 *below* the Social window. A plain shift would
+-- make it 2's focused window, so M-2 would land on it and the Social slot would
+-- wait for an M-j.
+zenPark :: Window -> WindowSet -> WindowSet
+zenPark w = insertQuiet False w (myWorkspaces !! 1) . W.delete' w
+
+-- ewmh activateHook: default doFocus, except for Zen while booting.
+zenActivateHook :: ManageHook
+zenActivateHook = do
+    hold <- zenWindow <&&> liftX zenBooting
+    if hold then idHook else doFocus
+
+-- Apply OUTSIDE ewmh. ewmh puts its own event hook in front of yours and every
+-- event hook runs (All only gates xmonad's default handler), so a hook composed
+-- under ewmh can't veto the request. This wraps the finished handleEventHook
+-- and skips the whole chain for a held request. After the boot hold, Zen's own
+-- moves go through again (e.g. its restore after a crash or an update restart).
+zenHoldDesktopRequests :: XConfig l -> XConfig l
+zenHoldDesktopRequests c = c { handleEventHook = \e -> do
+    held <- zenDesktopRequest e
+    if held then mempty else handleEventHook c e }
+
+-- A _NET_WM_DESKTOP request for one of Zen's main windows during the boot hold.
+zenDesktopRequest :: Event -> X Bool
+zenDesktopRequest ClientMessageEvent{ ev_window = w, ev_message_type = mt, ev_data = d } = do
+    a <- getAtom "_NET_WM_DESKTOP"
+    held <- if mt /= a then pure False else zenBooting <&&> runQuery zenWindow w
+    when held $ do
+        zenLog ("held _NET_WM_DESKTOP " ++ show (take 1 d) ++ " for window " ++ show w)
+        whenJust (listToMaybe d) (zenClaim w . fromIntegral)
+    pure held
+zenDesktopRequest _ = pure False
+
+-- A held request is the restored window saying which workspace it had at
+-- logout. If that workspace has a slot, the window takes it; first claim wins:
+--  * a free slot: taken directly, the window's map-order slot is freed again;
+--  * a slot that another window only got by map order: swapped. That window
+--    gets the claimant's old slot, or is parked if the claimant was surplus.
+-- So last session's windows come back where they were, with their spaces and
+-- tabs, and the slot commands mostly find nothing to do (zenBootLog doesn't
+-- reopen a file the space already shows). Requests for other workspaces are
+-- just held.
+zenClaim :: Window -> Int -> X ()
+zenClaim w d = do
+    st <- XS.get
+    let others  = [ p | p@(v, _, _) <- zbPending st, v /= w ]
+        mine    = listToMaybe [ s | (v, s, _) <- zbPending st, v == w ]
+        settled = zbSettled st
+        settle  = XS.put st { zbSettled = w : settled }
+    whenJust (listToMaybe (drop d myWorkspaces) >>= \t -> find ((== t) . zsWs) zenSlots) $ \t ->
+      if fmap zsWs mine == Just (zsWs t) then settle            -- already there
+      else unless (w `elem` settled) $
+        case [ v | (v, s, _) <- others, zsWs s == zsWs t ] of
+          v : _ | v `elem` settled -> pure ()                    -- v claimed it first
+          held -> do
+            let gets'   = [ (v, s, 0) | v <- held, Just s <- [mine] ]   -- v takes w's old slot
+                pend'   = (w, t, 0) : gets' ++ [ p | p@(u, _, _) <- others, u `notElem` held ]
+                taken   = [ zsWs s | (_, s, _) <- pend' ]
+                free'   = [ s | s <- zenSlots, zsWs s `notElem` taken ]
+            now <- epoch
+            XS.put st { zbPending = pend', zbFree = free', zbSettled = w : settled
+                      , zbUntil = if null free' then min (zbUntil st) (now + 10) else zbUntil st }
+            publishZenSlots
+            mapM_ zenClearStage (w : held)
+            windows $ foldr (.) (W.shiftWin (zsWs t) w) $
+                   [ W.shiftWin (zsWs s) v | (v, s, _) <- gets' ]
+                ++ [ zenPark v | v <- held, isNothing mine ]
+            zenLog ("window " ++ show w ++ " claims " ++ zsSpace t ++ " on" ++ zsWs t
+                    ++ concat [ "; window " ++ show v ++ maybe " parked" ((" gets " ++) . zsSpace) mine
+                              | v <- held ])
+
+-- How far a slot command got on its window (0 = nothing yet), see zenBootLog.
+zenStageProp :: String
+zenStageProp = "_ZEN_SLOT_STAGE"
+
+-- A window moved to another slot starts that slot from scratch.
+zenClearStage :: Window -> X ()
+zenClearStage w = withDisplay $ \dpy -> do
+    a <- getAtom zenStageProp
+    io $ deleteProperty dpy w a
+
+zenStage :: Window -> X Int
+zenStage w = do
+    p <- getProp32s zenStageProp w
+    pure $ case p of
+        Just (n : _) -> fromIntegral n
+        _            -> 0
+
+-- logHook
+zenBootLog :: X ()
+zenBootLog = do
+    st <- XS.get
+    unless (null (zbPending st)) $ do
+        ss  <- gets windowset
+        now <- epochMs
+        let foc  = W.peek ss
+            live = [ p | p@(w, _, _) <- zbPending st, w `elem` W.allWindows ss ]  -- drop closed windows
+        XS.put st { zbPending = live, zbFocus = foc }
+        -- only when focus has just moved to a pending window, and not while
+        -- its last command may still be running (it isn't sent twice)
+        case [ p | foc /= zbFocus st, p@(w, _, busy) <- live, Just w == foc, now >= busy ] of
+            (w, s, _) : _ -> do
+                stage    <- zenStage w
+                urlReady <- maybe (pure False) (io . doesFileExist) (zsUrl s)
+                let doSpace   = stage < 1
+                    wantUrl   = isJust (zsUrl s) && stage < 2
+                    doUrl     = wantUrl && urlReady
+                    rest      = filter (\(v, _, _) -> v /= w) live
+                    focused   = "[ \"$(xdotool getactivewindow)\" = " ++ show w ++ " ]"
+                    -- every step re-checks focus; the stage is marked before
+                    -- the hand-over, so a quick refocus can't run a step twice
+                    held      = focused ++ " || exit 0"
+                    mark n    = unwords [ "xprop -id", show w, "-f", zenStageProp, "32c"
+                                        , "-set", zenStageProp, show (n :: Int) ]
+                    -- synthetic keys go to the focused window; --clearmodifiers
+                    -- releases a Super still held from M-5, which would turn
+                    -- the typing into xmonad bindings
+                    key k     = "xdotool key --clearmodifiers " ++ k
+                    -- 1: the space alone. Alt+n only if the window still has focus.
+                    spaceCmds = [ held, mark 1, "zen-browser --space " ++ quote (zsSpace s) ]
+                             ++ concat [ [ "sleep 0.5", focused ++ " && " ++ key ("alt+" ++ show n) ]
+                                       | Just n <- [zsEssential s] ]
+                    -- 2: the file, from inside this window (1 s after step 1 when
+                    -- both run now). A URL given to zen-browser would be an
+                    -- external link, which Space Routing may send to another
+                    -- window and space (see "Zen startup windows").
+                    --  a. done if the window already shows it;
+                    --  b. URL bar (Ctrl+L) in Tabs mode ("% " + URL), Down,
+                    --     Return: switches to the tab if it is open, typically
+                    --     restored from last session (Zen starts on its empty
+                    --     tab, so (a) misses it); with no match nothing
+                    --     happens. Firefox looks in the current window first.
+                    --  c. --space again: if the match was in another space,
+                    --     this comes back to the slot's space;
+                    --  d. not showing it now: open it, Ctrl+L, URL, Alt+Return
+                    --     = new tab in this space, the current tab untouched.
+                    --     (Ctrl+T does nothing while a space sits on Zen's
+                    --     empty tab.)
+                    shows f   = "case \"$(xdotool getwindowname " ++ show w ++ ")\" in *"
+                                ++ quote (baseName f) ++ "*) exit 0;; esac"
+                    typeIn t  = "xdotool type --clearmodifiers --delay 4 " ++ quote t
+                    urlCmds   = concat [ [ held, mark 2, shows f
+                                         , key "ctrl+l", "sleep 0.4", held
+                                         , typeIn ("% file://" ++ f), "sleep 0.8", held
+                                         , key "Down", "sleep 0.2", key "Return", "sleep 1", held
+                                         , "zen-browser --space " ++ quote (zsSpace s), "sleep 0.8", shows f
+                                         , key "Escape Escape", "sleep 0.3", held
+                                         , key "ctrl+l", "sleep 0.4", held
+                                         , typeIn ("file://" ++ f), "sleep 0.3", held, key "alt+Return" ]
+                                       | Just f <- [zsUrl s] ]
+                    script    = intercalate "; " $ "sleep 0.3"
+                        : (if doSpace then spaceCmds else [])
+                       ++ (if doUrl then (if doSpace then ["sleep 1"] else []) ++ urlCmds else [])
+                if not doSpace && not wantUrl
+                    then XS.modify $ \b -> b { zbPending = rest }               -- slot complete
+                    else when (doSpace || doUrl) $ do                           -- else: URL file not there yet
+                        spawn script
+                        -- worst case: ~1.5 s for the space, ~8 s with the file
+                        let busy = now + (if doUrl then 10000 else 2500)
+                        XS.modify $ \b -> b { zbPending = (w, s, busy) : rest }
+            [] -> pure ()
+  where
+    quote x  = "'" ++ x ++ "'"
+    baseName = reverse . takeWhile (/= '/') . reverse
 
 soundDir = "/opt/sounds/"
 
@@ -684,6 +1156,26 @@ shiftPinAware tag = do
       Just p | foc == Just (pinWin p) -> unpinTo (const tag)
       _                               -> windows (W.shift tag)
 
+-- M-S-a. Off the pin's home workspace, the pinned window is only taken off
+-- this workspace's stack (as kill1 does with a copy) before the rest is
+-- killed, so it stays on the others. On its home workspace it is killed with
+-- everything else, which closes it everywhere. If this is its last copy,
+-- there is nowhere to keep it, so it is killed too (avoids an orphaned,
+-- unmanaged window).
+killAllPinAware :: X ()
+killAllPinAware = do
+    mp <- getPin
+    ss <- gets windowset
+    let cur = W.currentTag ss
+    whenJust mp $ \p -> do
+        let w        = pinWin p
+            dropHere = W.modify Nothing (W.filter (/= w))
+        when (cur /= pinHome p && w `elem` W.index ss && W.member w (dropHere ss)) $ do
+            putPin (Just p { pinFloat = M.delete cur (pinFloat p) })
+            windows dropHere
+    killAll
+
+
 myKeys :: XConfig l0 -> [((KeyMask, KeySym), NamedAction)]
 myKeys c =
   --(subtitle "Custom Keys":) $ mkNamedKeymap c $
@@ -695,7 +1187,7 @@ myKeys c =
   --, ("M-S-q", addName "Quit XMonad"            $ io exitSuccess)
   , ("M-S-c", addName "Kill focused window"    $ kill1)
   , ("M-S-q", addName "Quit XMonad"            $ spawn "dm-logout")
-  , ("M-S-a", addName "Kill all windows on WS" $ killAll)
+  , ("M-S-a", addName "Kill all windows on WS (pinned: closed everywhere only on its home WS)" $ killAllPinAware)
   , ("M-S-<Return>", addName "Run prompt"      $ sequence_ [spawn (mySoundPlayer ++ dmenuSound), spawn "PATH='$PATH' dmenu_path | dmenu_run -c -bw 2 -l 20 -g 4"])
   , ("M-S-b", addName "Toggle bar show/hide"   $ sendMessage ToggleStruts)
   , ("M-/", addName "DTOS Help"                $ spawn "dtos-help")
@@ -714,7 +1206,7 @@ myKeys c =
 
   ^++^ subKeys "Cycle non-empty workspaces"
   [ ("M-`",    addName "Next non-empty workspace" $ viewBy Next nonEmptyNonNSP)
-  , ("M-S-`",  addName "Prev non-empty workspace" $ viewBy Prev nonEmptyNonNSP)]
+  , ("M-C-`",  addName "Prev non-empty workspace" $ viewBy Prev nonEmptyNonNSP)]
 
   ^++^ subKeys "Pinned / Sticky windows"
   [ ("M-S-p", addName "Pin / unpin focused window (unpin returns it home)" $ togglePin)
@@ -774,12 +1266,13 @@ myKeys c =
   , ("M-S-l", addName "Bitwarden"  $ spawn  "dbus-run-session -- flatpak run com.bitwarden.desktop &")
   , ("M-d", addName "Launch Doom Emacs"        $ spawn "emacsclient -c -a ''")
   , ("M-M1-h", addName "Launch htop"           $ spawn (myTerminal ++ " -e htop"))
-  , ("<Print>", addName "Selection screenshot" $ spawn "maim -s | xclip -selection clipboard -t image/png")
+  , ("<Print>", addName "Selection screenshot" $ spawn "maim -s | tee ~/media/images/screenshots/$(date +%Y-%m-%d_%H%M%S).png | xclip -selection clipboard -t image/png")
+  , ("M-<Print>", addName "Full screenshot"    $ spawn "maim | tee ~/media/images/screenshots/$(date +%Y-%m-%d_%H%M%S).png | xclip -selection clipboard -t image/png")
   , ("M-C-v", addName "Primary paste"          $ spawn "xdotool click 1")
   , ("M-v", addName "Selection paste"          $ spawn "$HOME/.local/bin/paste_primary")
   , ("C-M1-t", addName "Secondary Terminal"    $ spawn "alacritty")
   , ("M-f", addName "Freetube"                 $ spawn "freetube")
-  , ("M-n", addName "Thunar"                   $ spawn "thunar")]
+  , ("M-n", addName "PCManFM"                   $ spawn "pcmanfm")]
 
   ^++^ subKeys "Monitors"
   [ ("M-.", addName "Switch focus to next monitor" $ nextScreen)
@@ -881,9 +1374,17 @@ main = do
   --xmproc1 <- spawnPipe ("xmobar -x 1 $HOME/.config/xmobar/.xmobarrc-secondary")
 --  xmproc2 <- spawnPipe ("xmobar -x 2 $HOME/.config/xmobar/" ++ colorScheme ++ "-xmobarrc")
   -- the xmonad, ya know...what the WM is named after!
-  xmonad $ addDescrKeys' ((mod4Mask, xK_F1), showKeybindings) myKeys $ ewmh $ docks $ def
-    { manageHook         = manageSpawn <+> myManageHook <+> manageDocks
-    , handleEventHook    = windowedFullscreenFixEventHook <> swallowEventHook (className =? "Alacritty"  <||> className =? "st-256color" <||> className =? "XTerm") (return True) <> trayerPaddingXmobarEventHook
+  xmonad $ addDescrKeys' ((mod4Mask, xK_F1), showKeybindings) myKeys
+         $ zenHoldDesktopRequests  -- outside ewmh, see "Zen startup windows"
+         $ setEwmhActivateHook zenActivateHook $ ewmh $ docks $ def
+      -- Steam games -> workspace 1, view unchanged. Leftmost = applied last, so
+      -- it overrides manageSpawn and every rule in myManageHook.
+    { manageHook         = (isSteamGame --> doShift (myWorkspaces !! 0))
+                       <+> zenBootManage <+> manageSpawn <+> myManageHook <+> manageDocks
+      -- Never swallow a Steam game: a swallowed window is put into the stack by
+      -- this hook, so xmonad's MapRequest handler sees it as already managed
+      -- and never runs manageHook on it (no shift to 1, no float).
+    , handleEventHook    = windowedFullscreenFixEventHook <> swallowEventHook (className =? "Alacritty"  <||> className =? "st-256color" <||> className =? "XTerm") (not <$> isSteamGame) <> trayerPaddingXmobarEventHook
     , modMask            = myModMask
     , terminal           = myTerminal
     , startupHook        = myStartupHook
@@ -895,6 +1396,9 @@ main = do
     , logHook = do
         -- per-workspace float state of the pinned window (must run on every refresh)
         pinLogHook
+
+        -- Zen startup windows: switch a slot's space when its window first gets focus
+        zenBootLog
 
         -- your status bar logging
         dynamicLogWithPP $  filterOutWsPP [scratchpadWorkspaceTag] $ xmobarPP
