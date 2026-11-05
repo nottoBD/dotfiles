@@ -8,3 +8,5 @@ favicons.*
 places.*
 storage/
 cache*/
+.zen/pgfi77ri.Default/*
+!.zen/pgfi77ri.Default/chrome/
