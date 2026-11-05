@@ -1,6 +1,7 @@
-function .webcam --description 'C920 live view'
-    set -l cam /dev/v4l/by-id/usb-046d_HD_Pro_Webcam_C920-video-index0
-    v4l2-ctl -d $cam -c exposure_dynamic_framerate=0 2>/dev/null
-    or v4l2-ctl -d $cam -c exposure_auto_priority=0 2>/dev/null
-    mpv --profile=webcam av://v4l2:$cam $argv
+function .webcam --description 'C920 live view in this terminal (q or Ctrl-C to stop)'
+    set -l cam (__c920); or return 1
+    ffmpeg -hide_banner -loglevel fatal -nostats \
+                -f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30 -i $cam \
+                -map 0:v -c:v copy -f nut pipe:1 |
+        __c920_view webcam $argv
 end
